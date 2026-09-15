@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import '../../core/env.dart';
 import '../../core/http_client.dart';
 import '../../core/token_storage.dart';
 
@@ -11,10 +14,18 @@ class AuthService {
   final ApiClient _apiClient;
   final TokenStorage _tokenStorage;
 
+  /// Autentica e registra o dispositivo atual (FR-017) no mesmo request.
   Future<void> login(String login, String senha) async {
     final resposta = await _apiClient.dio.post(
       '/auth/login',
-      data: {'login': login, 'senha': senha},
+      data: {
+        'login': login,
+        'senha': senha,
+        'dispositivo': {
+          'plataforma': Platform.isIOS ? 'ios' : 'android',
+          'versao_app': Env.appVersion,
+        },
+      },
     );
     _tokenStorage.definir(resposta.data['token'] as String);
   }

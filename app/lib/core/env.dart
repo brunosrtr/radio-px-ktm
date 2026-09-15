@@ -12,4 +12,8 @@ class Env {
     'WS_BASE_URL',
     defaultValue: 'ws://localhost:8080',
   );
+
+  /// Espelha a versão em pubspec.yaml — enviada no login para o registro de
+  /// dispositivo (FR-017).
+  static const String appVersion = '1.0.0';
 }

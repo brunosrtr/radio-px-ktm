@@ -156,18 +156,18 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T053 [P] [US4] Teste de integração: `POST /posicoes` insere o lote em `posicao` e só atualiza `posicao_atual` se `capturado_em` for mais recente que o já gravado, em `backend/internal/posicao/service_test.go`
-- [ ] T054 [P] [US4] Teste unitário do filtro de deslocamento/intervalo (novo ponto a cada 200m ou 30s, o que ocorrer primeiro) em `app/test/localizacao_service_test.dart`
+- [X] T053 [P] [US4] Teste de integração: `POST /posicoes` insere o lote em `posicao` e só atualiza `posicao_atual` se `capturado_em` for mais recente que o já gravado, em `backend/internal/posicao/service_test.go`
+- [X] T054 [P] [US4] Teste unitário do filtro de deslocamento/intervalo (novo ponto a cada 200m ou 30s, o que ocorrer primeiro) em `app/test/localizacao_service_test.dart`
 
 ### Implementation for User Story 4
 
-- [ ] T055 [P] [US4] Implementar repositório de `Posicao` e `PosicaoAtual` (insert em lote, update condicional por `capturado_em`) em `backend/internal/posicao/repositorio.go`
-- [ ] T056 [US4] Implementar serviço de ingestão de lote de posições em `backend/internal/posicao/service.go` (depende de T055)
-- [ ] T057 [US4] Implementar handler `POST /posicoes` em `backend/internal/transporte/posicoes_handler.go` (depende de T056)
-- [ ] T058 [P] [US4] Implementar fila offline local com Hive (armazenar, listar, remover por confirmação) em `app/lib/data/fila_posicoes_local.dart`
-- [ ] T059 [US4] Implementar `localizacao_service.dart`: coleta via `geolocator` com filtro de 200m/30s, grava na fila local, envia em lote a cada 1–2 minutos e remove apenas o confirmado pelo servidor, em `app/lib/services/localizacao_service.dart` (depende de T058)
-- [ ] T060 [US4] Implementar `background_service.dart` (foreground service Android + background modes iOS) mantendo WebSocket e coleta de localização ativos com o app em segundo plano, em `app/lib/services/background_service.dart` (depende de T027, T059)
-- [ ] T061 [P] [US4] Registrar dispositivo (plataforma, versão do app, `push_token`) no momento do login, em `backend/internal/usuario/` e `app/lib/features/auth/` (depende de T041)
+- [X] T055 [P] [US4] Implementar repositório de `Posicao` e `PosicaoAtual` (insert em lote, update condicional por `capturado_em`) em `backend/internal/posicao/repositorio.go`
+- [X] T056 [US4] Implementar serviço de ingestão de lote de posições em `backend/internal/posicao/service.go` (depende de T055)
+- [X] T057 [US4] Implementar handler `POST /posicoes` em `backend/internal/transporte/posicoes_handler.go` (depende de T056)
+- [X] T058 [P] [US4] Implementar fila offline local com Hive (armazenar, listar, remover por confirmação) em `app/lib/data/fila_posicoes_local.dart`
+- [X] T059 [US4] Implementar `localizacao_service.dart`: coleta via `geolocator` com filtro de 200m/30s, grava na fila local, envia em lote a cada 1–2 minutos e remove apenas o confirmado pelo servidor, em `app/lib/services/localizacao_service.dart` (depende de T058)
+- [X] T060 [US4] Implementar `background_service.dart` (foreground service Android + background modes iOS) mantendo WebSocket e coleta de localização ativos com o app em segundo plano, em `app/lib/services/background_service.dart` (depende de T027, T059)
+- [X] T061 [P] [US4] Registrar dispositivo (plataforma, versão do app, `push_token`) no momento do login, em `backend/internal/usuario/` e `app/lib/features/auth/` (depende de T041)
 
 **Checkpoint**: User Stories 1–4 funcionam de forma independente e integrada.
 

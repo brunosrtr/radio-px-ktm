@@ -4,7 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../services/audio_service.dart';
+import '../../services/background_service.dart';
 import '../../services/canal_service.dart';
+import '../../services/localizacao_service.dart';
 
 /// Tela do canal ativo: botão push-to-talk, bloqueio quando a fila está
 /// cheia e exibição do nome de quem está falando (FR-04 a FR-09, FR-21).
@@ -25,6 +27,7 @@ class CanalAtivoPage extends StatefulWidget {
 class _CanalAtivoPageState extends State<CanalAtivoPage> {
   final _canalService = CanalService();
   final _audioService = AudioService();
+  final _localizacaoService = LocalizacaoService();
 
   StreamSubscription<EventoCanal>? _assinaturaEventos;
   StreamSubscription<Uint8List>? _assinaturaGravacao;
@@ -49,6 +52,9 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     await _canalService.conectar();
     _assinaturaEventos = _canalService.eventos.listen(_processarEvento);
     _canalService.entrarCanal(widget.canalId);
+
+    await BackgroundService.iniciar();
+    await _localizacaoService.iniciar();
   }
 
   void _processarEvento(EventoCanal evento) {
@@ -149,6 +155,8 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     _canalService.sairCanal(widget.canalId);
     unawaited(_canalService.desconectar());
     unawaited(_audioService.fechar());
+    unawaited(_localizacaoService.parar());
+    unawaited(BackgroundService.parar());
     super.dispose();
   }
 

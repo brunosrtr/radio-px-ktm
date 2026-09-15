@@ -1,0 +1,69 @@
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+
+/// Mantém o processo do app vivo em segundo plano no Android via um
+/// foreground service com notificação persistente — o Android não mata o
+/// processo enquanto ela estiver visível, então a conexão WebSocket
+/// (`canal_service.dart`) e a coleta de localização
+/// (`localizacao_service.dart`) continuam rodando normalmente na isolate
+/// principal do app (RF-07, RNF-09).
+///
+/// O `TaskHandler` abaixo não reimplementa a lógica de voz/localização numa
+/// isolate separada — seu único papel é sustentar essa notificação. Em iOS
+/// não existe um foreground service equivalente; o app depende dos
+/// "background modes" nativos (location) declarados em
+/// `ios/Runner/Info.plist`.
+class BackgroundService {
+  BackgroundService._();
+
+  static bool _inicializado = false;
+
+  static void _inicializar() {
+    if (_inicializado) return;
+    _inicializado = true;
+
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'radio_px_canal_ativo',
+        channelName: 'Rádio PX — canal ativo',
+        channelDescription:
+            'Mantém a conexão de voz e a localização ativas em segundo plano.',
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.repeat(60000),
+        autoRunOnBoot: false,
+        allowWifiLock: true,
+      ),
+    );
+  }
+
+  /// Inicia o foreground service, se ainda não estiver rodando.
+  static Future<void> iniciar() async {
+    _inicializar();
+    if (await FlutterForegroundTask.isRunningService) return;
+
+    await FlutterForegroundTask.startService(
+      notificationTitle: 'Rádio PX Digital',
+      notificationText: 'Canal de voz e localização ativos',
+      callback: iniciarTarefaDeSegundoPlano,
+    );
+  }
+
+  static Future<void> parar() => FlutterForegroundTask.stopService();
+}
+
+@pragma('vm:entry-point')
+void iniciarTarefaDeSegundoPlano() {
+  FlutterForegroundTask.setTaskHandler(_TarefaMantemNotificacaoViva());
+}
+
+class _TarefaMantemNotificacaoViva extends TaskHandler {
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {}
+
+  @override
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {}
+}

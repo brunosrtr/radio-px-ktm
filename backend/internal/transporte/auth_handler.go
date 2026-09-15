@@ -2,6 +2,7 @@ package transporte
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/auth"
@@ -23,8 +24,13 @@ func NovoAuthHandler(usuarios *usuario.Repositorio, jwtSecret string) *AuthHandl
 // Login autentica por login/senha e devolve um JWT (FR-020, RF21).
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var corpo struct {
-		Login string `json:"login"`
-		Senha string `json:"senha"`
+		Login       string `json:"login"`
+		Senha       string `json:"senha"`
+		Dispositivo *struct {
+			Plataforma string  `json:"plataforma"`
+			VersaoApp  string  `json:"versao_app"`
+			PushToken  *string `json:"push_token"`
+		} `json:"dispositivo"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&corpo); err != nil {
 		responderErro(w, http.StatusBadRequest, "mensagem_invalida", "corpo da requisição inválido")
@@ -45,6 +51,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		responderErro(w, http.StatusInternalServerError, "erro_interno", "não foi possível gerar o token")
 		return
+	}
+
+	if corpo.Dispositivo != nil && corpo.Dispositivo.Plataforma != "" {
+		if err := h.usuarios.RegistrarDispositivo(
+			r.Context(), u.ID, corpo.Dispositivo.Plataforma, corpo.Dispositivo.VersaoApp, corpo.Dispositivo.PushToken,
+		); err != nil {
+			// Não crítico para o login em si — só registra e segue.
+			log.Printf("auth: erro ao registrar dispositivo: %v", err)
+		}
 	}
 
 	responderJSON(w, http.StatusOK, map[string]any{

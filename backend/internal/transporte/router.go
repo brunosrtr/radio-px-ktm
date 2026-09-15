@@ -12,6 +12,7 @@ import (
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/auth"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/canal"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/config"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/geofence"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
@@ -35,8 +36,12 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	servicoCanais := canal.NovoServico(repositorioCanais, gerenciadorCanais, repositorioPosicoes)
 	repositorioUsuarios := usuario.NovoRepositorio(pool)
 
+	verificadorGeocerca := geofence.NovoVerificador(canal.NovoAdaptadorGeocerca(gerenciadorCanais, repositorioCanais))
+	servicoPosicoes := posicao.NovoServico(repositorioPosicoes, verificadorGeocerca)
+
 	authHandler := NovoAuthHandler(repositorioUsuarios, cfg.JWTSecret)
 	canaisHandler := NovoCanaisHandler(servicoCanais)
+	posicoesHandler := NovoPosicoesHandler(servicoPosicoes)
 	wsHandler := ws.NovoHandler(gerenciadorCanais, servicoCanais, repositorioCanais, repositorioUsuarios)
 
 	r.Post("/auth/login", authHandler.Login)
@@ -52,6 +57,8 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 		r.Post("/canais/{id}/empresas", canaisHandler.LiberarEmpresa)
 		r.Delete("/canais/{id}/empresas/{empresaId}", canaisHandler.RevogarEmpresa)
 		r.Put("/canais/{id}/preferencia", canaisHandler.DefinirPreferencia)
+
+		r.Post("/posicoes", posicoesHandler.Receber)
 
 		r.Get("/ws", wsHandler.ServeHTTP)
 	})

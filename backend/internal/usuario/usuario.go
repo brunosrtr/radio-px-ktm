@@ -93,3 +93,21 @@ func (r *Repositorio) Criar(ctx context.Context, u Usuario) (*Usuario, error) {
 	}
 	return &u, nil
 }
+
+// RegistrarDispositivo grava (ou atualiza, se já existir um dispositivo do
+// usuário na mesma plataforma) o dispositivo móvel usado no login —
+// push_token é usado para avisos de remoção por geocerca (FR-017).
+func (r *Repositorio) RegistrarDispositivo(ctx context.Context, usuarioID, plataforma, versaoApp string, pushToken *string) error {
+	_, err := r.pool.Exec(ctx, `
+		insert into dispositivo (usuario_id, plataforma, push_token, versao_app)
+		values ($1, $2, $3, nullif($4, ''))
+		on conflict (usuario_id, plataforma) do update set
+			push_token = excluded.push_token,
+			versao_app = excluded.versao_app,
+			visto_em = now()
+	`, usuarioID, plataforma, pushToken, versaoApp)
+	if err != nil {
+		return fmt.Errorf("usuario: erro ao registrar dispositivo: %w", err)
+	}
+	return nil
+}
