@@ -133,16 +133,16 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T046 [P] [US3] Teste unitário da função de distância Haversine (pontos dentro e fora do raio) em `backend/internal/geofence/distancia_test.go`
-- [ ] T047 [P] [US3] Teste de integração: entrada recusada fora do raio (`fora_da_area`) e remoção automática com `motivo_saida='geocerca'` ao sair do raio, em `backend/internal/geofence/geofence_test.go`
+- [X] T046 [P] [US3] Teste unitário da função de distância Haversine (pontos dentro e fora do raio) em `backend/internal/geofence/distancia_test.go`
+- [X] T047 [P] [US3] Teste de integração: entrada recusada fora do raio (`fora_da_area`) e remoção automática com `motivo_saida='geocerca'` ao sair do raio, em `backend/internal/geofence/geofence_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T048 [P] [US3] Implementar função de distância Haversine em `backend/internal/geofence/distancia.go`
-- [ ] T049 [US3] Adicionar checagem de geocerca ao `entrar_canal`, usando a última `posicao_atual` do motorista, em `backend/internal/canal/hub.go` (depende de T038, T048)
-- [ ] T050 [US3] Implementar verificador de geocerca acionado a cada atualização de posição, que remove motoristas fora do raio, envia `removido_canal` e grava `motivo_saida='geocerca'`, em `backend/internal/geofence/verificador.go` (depende de T048, T020)
-- [ ] T051 [US3] Filtrar `GET /canais` pela geocerca usando a `posicao_atual` do motorista em `backend/internal/canal/service.go` (depende de T037, T048)
-- [ ] T052 [P] [US3] Exibir aviso no app quando `removido_canal` chega com motivo geocerca, em `app/lib/features/canais/canal_ativo_page.dart` (depende de T028)
+- [X] T048 [P] [US3] Implementar função de distância Haversine em `backend/internal/geofence/distancia.go`
+- [X] T049 [US3] Adicionar checagem de geocerca ao `entrar_canal`, usando a última `posicao_atual` do motorista, em `backend/internal/canal/hub.go` (depende de T038, T048)
+- [X] T050 [US3] Implementar verificador de geocerca acionado a cada atualização de posição, que remove motoristas fora do raio, envia `removido_canal` e grava `motivo_saida='geocerca'`, em `backend/internal/geofence/verificador.go` (depende de T048, T020)
+- [X] T051 [US3] Filtrar `GET /canais` pela geocerca usando a `posicao_atual` do motorista em `backend/internal/canal/service.go` (depende de T037, T048)
+- [X] T052 [P] [US3] Exibir aviso no app quando `removido_canal` chega com motivo geocerca, em `app/lib/features/canais/canal_ativo_page.dart` (depende de T028)
 
 **Checkpoint**: User Stories 1, 2 e 3 funcionam de forma independente e integrada.
 

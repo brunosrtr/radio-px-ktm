@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/geofence"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 )
 
 // ErrCanalInvalido indica que o corpo de criação/edição de canal não passa
@@ -12,6 +15,10 @@ var ErrCanalInvalido = errors.New("canal: dados inválidos")
 
 // ErrSemPermissao indica que a empresa do usuário não tem acesso ao canal.
 var ErrSemPermissao = errors.New("canal: sem permissão")
+
+// ErrForaDaArea indica que a última posição conhecida do motorista está fora
+// do raio de geocerca do canal (ou que ele não tem posição registrada).
+var ErrForaDaArea = errors.New("canal: fora da área do canal")
 
 var limitesValidos = map[int]bool{5: true, 10: true, 15: true, 20: true}
 
@@ -40,12 +47,14 @@ type CanalListado struct {
 type Servico struct {
 	repositorio *Repositorio
 	gerenciador *Gerenciador
+	posicoes    *posicao.Repositorio
 }
 
-// NovoServico cria o Servico de canais sobre o repositório e o gerenciador
-// do hub em memória informados.
-func NovoServico(repositorio *Repositorio, gerenciador *Gerenciador) *Servico {
-	return &Servico{repositorio: repositorio, gerenciador: gerenciador}
+// NovoServico cria o Servico de canais sobre o repositório, o gerenciador do
+// hub em memória e o repositório de posições (para a checagem de geocerca)
+// informados.
+func NovoServico(repositorio *Repositorio, gerenciador *Gerenciador, posicoes *posicao.Repositorio) *Servico {
+	return &Servico{repositorio: repositorio, gerenciador: gerenciador, posicoes: posicoes}
 }
 
 func validarDTO(dto DTOCanal) error {
@@ -157,29 +166,45 @@ func (s *Servico) DefinirPreferencia(ctx context.Context, usuarioID, canalID str
 	return nil
 }
 
-// ObterParaEntrada busca um canal e confirma que a empresa informada tem
-// autorização de acesso — usado pelo handler WebSocket em entrar_canal.
-func (s *Servico) ObterParaEntrada(ctx context.Context, canalID, empresaID string) (*CanalDB, error) {
+// ObterParaEntrada busca um canal, confirma que a empresa informada tem
+// autorização de acesso e, se a geocerca estiver ativa, que a última posição
+// conhecida do motorista está dentro do raio (FR-014/FR-015) — usado pelo
+// handler WebSocket em entrar_canal.
+func (s *Servico) ObterParaEntrada(ctx context.Context, canalID, empresaID, usuarioID string) (*CanalDB, error) {
 	c, err := s.repositorio.ObterCanal(ctx, canalID)
 	if err != nil {
 		return nil, err
 	}
-	if c.EmpresaID == empresaID {
-		return c, nil
-	}
-	autorizado, err := s.repositorio.EstaAutorizada(ctx, canalID, empresaID)
-	if err != nil {
-		return nil, err
+
+	autorizado := c.EmpresaID == empresaID
+	if !autorizado {
+		autorizado, err = s.repositorio.EstaAutorizada(ctx, canalID, empresaID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if !autorizado {
 		return nil, ErrSemPermissao
 	}
+
+	if c.GeocercaAtiva {
+		pos, err := s.posicoes.ObterAtual(ctx, usuarioID)
+		if err != nil {
+			return nil, ErrForaDaArea
+		}
+		if !geofence.DentroDoRaio(pos.Latitude, pos.Longitude, *c.CentroLatitude, *c.CentroLongitude, *c.RaioMetros) {
+			return nil, ErrForaDaArea
+		}
+	}
+
 	return c, nil
 }
 
 // ListarParaMotorista retorna os canais autorizados para a empresa do
-// motorista, com o total de participantes atuais (do hub em memória) e se o
-// próprio motorista o silenciou (RNF12).
+// motorista, com o total de participantes atuais (do hub em memória), se o
+// próprio motorista o silenciou (RNF12), e já excluindo canais com geocerca
+// ativa fora do alcance da última posição conhecida do motorista (FR-014,
+// FR-015, FR-029).
 func (s *Servico) ListarParaMotorista(ctx context.Context, empresaID, usuarioID string) ([]CanalListado, error) {
 	canais, err := s.repositorio.ListarAutorizados(ctx, empresaID)
 	if err != nil {
@@ -191,8 +216,22 @@ func (s *Servico) ListarParaMotorista(ctx context.Context, empresaID, usuarioID 
 		return nil, err
 	}
 
+	posicaoAtual, err := s.posicoes.ObterAtual(ctx, usuarioID)
+	if err != nil && !errors.Is(err, posicao.ErrNaoEncontrada) {
+		return nil, err
+	}
+
 	listados := make([]CanalListado, 0, len(canais))
 	for _, c := range canais {
+		if c.GeocercaAtiva {
+			if posicaoAtual == nil {
+				continue
+			}
+			if !geofence.DentroDoRaio(posicaoAtual.Latitude, posicaoAtual.Longitude, *c.CentroLatitude, *c.CentroLongitude, *c.RaioMetros) {
+				continue
+			}
+		}
+
 		participantesAtual := 0
 		if hub, ok := s.gerenciador.Obter(c.ID); ok {
 			participantesAtual = hub.Participantes()

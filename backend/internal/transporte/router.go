@@ -12,6 +12,7 @@ import (
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/auth"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/canal"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/config"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/ws"
@@ -30,7 +31,8 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 
 	gerenciadorCanais := canal.NovoGerenciador()
 	repositorioCanais := canal.NovoRepositorio(pool)
-	servicoCanais := canal.NovoServico(repositorioCanais, gerenciadorCanais)
+	repositorioPosicoes := posicao.NovoRepositorio(pool)
+	servicoCanais := canal.NovoServico(repositorioCanais, gerenciadorCanais, repositorioPosicoes)
 	repositorioUsuarios := usuario.NovoRepositorio(pool)
 
 	authHandler := NovoAuthHandler(repositorioUsuarios, cfg.JWTSecret)

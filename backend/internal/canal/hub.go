@@ -139,6 +139,30 @@ func (c *Canal) Sair(usuarioID string) {
 	delete(c.membros, usuarioID)
 }
 
+// TemMembro indica se o usuário está atualmente conectado ao canal.
+func (c *Canal) TemMembro(usuarioID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, ok := c.membros[usuarioID]
+	return ok
+}
+
+// Remover força a saída de um membro do canal, notificando-o com o evento
+// informado antes de descartar sua participação — usado por remoções
+// iniciadas pelo servidor (geocerca, limite, canal desativado), diferente de
+// Sair, que é a saída voluntária do próprio usuário.
+func (c *Canal) Remover(usuarioID string, evento Evento) {
+	c.mu.Lock()
+	m, ok := c.membros[usuarioID]
+	if ok {
+		delete(c.membros, usuarioID)
+	}
+	c.mu.Unlock()
+	if ok {
+		m.enviar(evento)
+	}
+}
+
 // Participantes retorna o número de membros atualmente no canal.
 func (c *Canal) Participantes() int {
 	c.mu.Lock()

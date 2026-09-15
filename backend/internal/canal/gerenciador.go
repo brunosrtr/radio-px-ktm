@@ -43,3 +43,18 @@ func (g *Gerenciador) Obter(canalID string) (*Canal, bool) {
 	c, ok := g.canais[canalID]
 	return c, ok
 }
+
+// CanaisDoUsuario lista os canais em que o usuário está atualmente conectado
+// — usado pelo verificador de geocerca (US3) a cada atualização de posição.
+func (g *Gerenciador) CanaisDoUsuario(usuarioID string) []string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	var ids []string
+	for id, c := range g.canais {
+		if c.TemMembro(usuarioID) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}

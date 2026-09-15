@@ -147,13 +147,15 @@ func (s *sessao) processarMensagem(ctx context.Context, dados []byte) {
 func (s *sessao) entrarCanal(ctx context.Context, canalID string) {
 	s.sairCanalAtual("manual")
 
-	canalDB, err := s.handler.servico.ObterParaEntrada(ctx, canalID, s.empresaID)
+	canalDB, err := s.handler.servico.ObterParaEntrada(ctx, canalID, s.empresaID, s.usuarioID)
 	if err != nil {
 		switch {
 		case errors.Is(err, canal.ErrNaoEncontrado):
 			s.enviarErro(ctx, "nao_encontrado", "canal não encontrado")
 		case errors.Is(err, canal.ErrSemPermissao):
 			s.enviarErro(ctx, "sem_permissao", "empresa não autorizada a acessar este canal")
+		case errors.Is(err, canal.ErrForaDaArea):
+			s.enviarErro(ctx, "fora_da_area", "fora da área de geocerca do canal")
 		default:
 			log.Printf("ws: erro ao buscar canal para entrada: %v", err)
 			s.enviarErro(ctx, "erro_interno", "não foi possível validar o canal")
@@ -288,10 +290,27 @@ func (s *sessao) encaminharEventos(ctx context.Context, membro *canal.Membro) {
 				continue
 			}
 			s.enviarEvento(ctx, e)
+			if e.Tipo == "removido_canal" {
+				// Remoção iniciada pelo servidor (geocerca, limite, canal
+				// desativado): o hub já tirou o membro do canal, então só
+				// resta limpar o estado local da sessão.
+				s.limparCanalAtual()
+				return
+			}
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+func (s *sessao) limparCanalAtual() {
+	s.mu.Lock()
+	s.canalAtual = nil
+	s.canalID = ""
+	s.membro = nil
+	s.transmissaoID = ""
+	s.pararEncaminhamento = nil
+	s.mu.Unlock()
 }
 
 func (s *sessao) enviarEvento(ctx context.Context, e canal.Evento) {

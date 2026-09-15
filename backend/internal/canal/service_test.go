@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage/testutil"
 )
 
@@ -12,7 +13,7 @@ func TestCriarCanalValidaLimiteEGeocerca(t *testing.T) {
 	pool := testutil.AbrirPool(t)
 	empresaID := testutil.CriarEmpresa(t, pool)
 
-	servico := NovoServico(NovoRepositorio(pool), NovoGerenciador())
+	servico := NovoServico(NovoRepositorio(pool), NovoGerenciador(), posicao.NovoRepositorio(pool))
 	ctx := context.Background()
 
 	raio := 1000
@@ -70,7 +71,7 @@ func TestListarParaMotoristaFiltraPorAutorizacaoDeEmpresa(t *testing.T) {
 	empresaC := testutil.CriarEmpresa(t, pool)
 	motoristaA := testutil.CriarUsuario(t, pool, empresaA, "motorista")
 
-	servico := NovoServico(NovoRepositorio(pool), NovoGerenciador())
+	servico := NovoServico(NovoRepositorio(pool), NovoGerenciador(), posicao.NovoRepositorio(pool))
 
 	canalPrivadoA, err := servico.Criar(ctx, empresaA, DTOCanal{
 		Nome: "Privado A", TipoAcesso: "privado", LimiteParticipantes: 10,
