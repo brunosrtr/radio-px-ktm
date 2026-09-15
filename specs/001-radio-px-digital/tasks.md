@@ -32,12 +32,12 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 **Purpose**: Inicialização do projeto — Etapa 1 do briefing ("Fundação")
 
-- [ ] T001 Criar estrutura de diretórios do backend (`backend/cmd/api/`, `backend/internal/{config,auth,empresa,usuario,canal,posicao,geofence,ws,transporte,storage}/`, `backend/painel/`, `backend/migrations/`) e do app (`app/lib/{core,models,data,services,features}/`, `app/test/`) conforme plan.md
-- [ ] T002 Inicializar módulo Go em `backend/go.mod` com as dependências `pgx`, `chi`, `coder/websocket`, `golang-jwt`
-- [ ] T003 [P] Inicializar projeto Flutter em `app/pubspec.yaml` com `riverpod`, `dio`, `web_socket_channel`, `geolocator`, `flutter_foreground_task`, `flutter_sound`, `hive`
-- [ ] T004 [P] Criar `docker-compose.yml` na raiz do repositório com os serviços `postgres` e `backend`
-- [ ] T005 [P] Criar `.env.example` na raiz com as variáveis de ambiente iniciais (conexão Postgres, segredo JWT, porta do backend)
-- [ ] T006 [P] Configurar lint/format do backend (`gofmt` + `golangci-lint`) e do app (`flutter analyze`)
+- [X] T001 Criar estrutura de diretórios do backend (`backend/cmd/api/`, `backend/internal/{config,auth,empresa,usuario,canal,posicao,geofence,ws,transporte,storage}/`, `backend/painel/`, `backend/migrations/`) e do app (`app/lib/{core,models,data,services,features}/`, `app/test/`) conforme plan.md
+- [X] T002 Inicializar módulo Go em `backend/go.mod` com as dependências `pgx`, `chi`, `coder/websocket`, `golang-jwt`
+- [X] T003 [P] Inicializar projeto Flutter em `app/pubspec.yaml` com `riverpod`, `dio`, `web_socket_channel`, `geolocator`, `flutter_foreground_task`, `flutter_sound`, `hive`
+- [X] T004 [P] Criar `docker-compose.yml` na raiz do repositório com os serviços `postgres` e `backend`
+- [X] T005 [P] Criar `.env.example` na raiz com as variáveis de ambiente iniciais (conexão Postgres, segredo JWT, porta do backend)
+- [X] T006 [P] Configurar lint/format do backend (`gofmt` + `golangci-lint`) e do app (`flutter analyze`)
 
 ---
 
@@ -47,14 +47,14 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 **⚠️ CRITICAL**: Nenhuma user story começa antes desta fase estar completa
 
-- [ ] T007 Criar migração inicial `backend/migrations/0001_init.sql` com o DDL completo de data-model.md (`empresa`, `usuario`, `dispositivo`, `canal`, `canal_empresa`, `participacao_canal`, `preferencia_canal`, `posicao`, `posicao_atual`), idempotente
-- [ ] T008 [P] Implementar carregamento de configuração por variáveis de ambiente em `backend/internal/config/config.go`
-- [ ] T009 Implementar pool de conexão `pgx` e aplicação idempotente das migrações em `backend/internal/storage/storage.go` (depende de T007, T008)
-- [ ] T010 [P] Implementar hash de senha (bcrypt) e geração/validação de JWT com claims `usuario_id`, `empresa_id`, `papel` em `backend/internal/auth/auth.go`
-- [ ] T011 [P] Implementar middleware HTTP e de upgrade WebSocket que valida o JWT e injeta `usuario_id`/`empresa_id`/`papel` no contexto da requisição, retornando 401 quando ausente/inválido (RNF11) em `backend/internal/auth/middleware.go` (depende de T010)
-- [ ] T012 Configurar roteador base (`chi`) e o endpoint `GET /health` em `backend/internal/transporte/router.go` e `backend/cmd/api/main.go` (depende de T009)
-- [ ] T013 [P] Criar cliente HTTP (`dio`) com interceptor de autenticação (anexa o Bearer token) em `app/lib/core/http_client.dart`
-- [ ] T014 [P] Criar rotas e tema base do app em `app/lib/core/`
+- [X] T007 Criar migração inicial `backend/migrations/0001_init.sql` com o DDL completo de data-model.md (`empresa`, `usuario`, `dispositivo`, `canal`, `canal_empresa`, `participacao_canal`, `preferencia_canal`, `posicao`, `posicao_atual`), idempotente
+- [X] T008 [P] Implementar carregamento de configuração por variáveis de ambiente em `backend/internal/config/config.go`
+- [X] T009 Implementar pool de conexão `pgx` e aplicação idempotente das migrações em `backend/internal/storage/storage.go` (depende de T007, T008)
+- [X] T010 [P] Implementar hash de senha (bcrypt) e geração/validação de JWT com claims `usuario_id`, `empresa_id`, `papel` em `backend/internal/auth/auth.go`
+- [X] T011 [P] Implementar middleware HTTP e de upgrade WebSocket que valida o JWT e injeta `usuario_id`/`empresa_id`/`papel` no contexto da requisição, retornando 401 quando ausente/inválido (RNF11) em `backend/internal/auth/middleware.go` (depende de T010)
+- [X] T012 Configurar roteador base (`chi`) e o endpoint `GET /health` em `backend/internal/transporte/router.go` e `backend/cmd/api/main.go` (depende de T009)
+- [X] T013 [P] Criar cliente HTTP (`dio`) com interceptor de autenticação (anexa o Bearer token) em `app/lib/core/http_client.dart`
+- [X] T014 [P] Criar rotas e tema base do app em `app/lib/core/`
 
 **Checkpoint**: `docker compose up` sobe Postgres + backend, migrações aplicam sem erro, `GET /health` responde — critério de aceite da Etapa 1 do briefing (ver quickstart.md).
 
@@ -70,23 +70,23 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 > Escrever estes testes PRIMEIRO; devem falhar antes da implementação.
 
-- [ ] T015 [P] [US1] Teste unitário: fila do hub aceita até 10 mensagens e recusa a 11ª com `fila_cheia`, em `backend/internal/canal/hub_test.go`
-- [ ] T016 [P] [US1] Teste unitário: fila reproduz mensagens estritamente na ordem de chegada (FIFO) e zera o buffer de chunks após cada reprodução, em `backend/internal/canal/hub_test.go`
-- [ ] T017 [P] [US1] Teste unitário: transmissão é cortada automaticamente ao atingir 90 segundos, em `backend/internal/canal/hub_test.go`
-- [ ] T018 [P] [US1] Teste de integração do protocolo WebSocket: `entrar_canal` → `solicitar_slot` → `slot_concedido` → frames binários → `inicio_reproducao`/`fim_reproducao`, em `backend/internal/ws/handler_test.go`
+- [X] T015 [P] [US1] Teste unitário: fila do hub aceita até 10 mensagens e recusa a 11ª com `fila_cheia`, em `backend/internal/canal/hub_test.go`
+- [X] T016 [P] [US1] Teste unitário: fila reproduz mensagens estritamente na ordem de chegada (FIFO) e zera o buffer de chunks após cada reprodução, em `backend/internal/canal/hub_test.go`
+- [X] T017 [P] [US1] Teste unitário: transmissão é cortada automaticamente ao atingir 90 segundos, em `backend/internal/canal/hub_test.go`
+- [X] T018 [P] [US1] Teste de integração do protocolo WebSocket: `entrar_canal` → `solicitar_slot` → `slot_concedido` → frames binários → `inicio_reproducao`/`fim_reproducao`, em `backend/internal/ws/handler_test.go`
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] Criar tipos `Canal` e `Transmissao` (fila em memória `chan *Transmissao` capacidade 10, buffer de chunks `[][]byte`) em `backend/internal/canal/hub.go`
-- [ ] T020 [US1] Implementar o hub por canal: goroutine consumidora, distribuição FIFO aos membros não silenciados, buffer zerado após distribuir, em `backend/internal/canal/hub.go` (depende de T019)
-- [ ] T021 [US1] Implementar corte automático de transmissão ao atingir 90 segundos dentro do hub em `backend/internal/canal/hub.go` (depende de T020)
-- [ ] T022 [US1] Implementar registro básico de `participacao_canal` (entrar/sair, sem checagem de limite ou geocerca ainda — essas vêm nas fases US2/US3) em `backend/internal/canal/repositorio.go`
-- [ ] T023 [US1] Implementar handler de upgrade WebSocket e roteamento dos eventos `entrar_canal`, `solicitar_slot`, `finalizar_transmissao`, `ping` em `backend/internal/ws/handler.go` (depende de T011, T020, T022)
-- [ ] T024 [US1] Implementar recepção/encaminhamento de frames binários de áudio associados à transmissão ativa da conexão, emitindo `inicio_reproducao` (com nome do remetente) e `fim_reproducao`, em `backend/internal/ws/handler.go` (depende de T023)
-- [ ] T025 [US1] Conectar a rota `GET /ws` ao roteador em `backend/internal/transporte/router.go` (depende de T012, T023)
-- [ ] T026 [P] [US1] Implementar `audio_service.dart` (gravação/reprodução em streaming, codec Opus, ≤24 kbps, sem gravar em arquivo local) em `app/lib/services/audio_service.dart`
-- [ ] T027 [P] [US1] Implementar `canal_service.dart` (conexão WebSocket, eventos de controle, envio/recepção de frames binários) em `app/lib/services/canal_service.dart`
-- [ ] T028 [US1] Implementar a tela do canal ativo (botão push-to-talk, bloqueio quando a fila está cheia, exibição do nome do remetente durante a reprodução) em `app/lib/features/canais/canal_ativo_page.dart` (depende de T026, T027)
+- [X] T019 [P] [US1] Criar tipos `Canal` e `Transmissao` (fila em memória `chan *Transmissao` capacidade 10, buffer de chunks `[][]byte`) em `backend/internal/canal/hub.go`
+- [X] T020 [US1] Implementar o hub por canal: goroutine consumidora, distribuição FIFO aos membros não silenciados, buffer zerado após distribuir, em `backend/internal/canal/hub.go` (depende de T019)
+- [X] T021 [US1] Implementar corte automático de transmissão ao atingir 90 segundos dentro do hub em `backend/internal/canal/hub.go` (depende de T020)
+- [X] T022 [US1] Implementar registro básico de `participacao_canal` (entrar/sair, sem checagem de limite ou geocerca ainda — essas vêm nas fases US2/US3) em `backend/internal/canal/repositorio.go`
+- [X] T023 [US1] Implementar handler de upgrade WebSocket e roteamento dos eventos `entrar_canal`, `solicitar_slot`, `finalizar_transmissao`, `ping` em `backend/internal/ws/handler.go` (depende de T011, T020, T022)
+- [X] T024 [US1] Implementar recepção/encaminhamento de frames binários de áudio associados à transmissão ativa da conexão, emitindo `inicio_reproducao` (com nome do remetente) e `fim_reproducao`, em `backend/internal/ws/handler.go` (depende de T023)
+- [X] T025 [US1] Conectar a rota `GET /ws` ao roteador em `backend/internal/transporte/router.go` (depende de T012, T023)
+- [X] T026 [P] [US1] Implementar `audio_service.dart` (gravação/reprodução em streaming, codec Opus, ≤24 kbps, sem gravar em arquivo local) em `app/lib/services/audio_service.dart`
+- [X] T027 [P] [US1] Implementar `canal_service.dart` (conexão WebSocket, eventos de controle, envio/recepção de frames binários) em `app/lib/services/canal_service.dart`
+- [X] T028 [US1] Implementar a tela do canal ativo (botão push-to-talk, bloqueio quando a fila está cheia, exibição do nome do remetente durante a reprodução) em `app/lib/features/canais/canal_ativo_page.dart` (depende de T026, T027)
 
 **Checkpoint**: User Story 1 completa e testável de forma independente.
 

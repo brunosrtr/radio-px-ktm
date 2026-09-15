@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'core/routes.dart';
+import 'core/theme.dart';
 
 void main() {
-  runApp(const RadioPxApp());
+  runApp(const ProviderScope(child: RadioPxApp()));
 }
 
 class RadioPxApp extends StatelessWidget {
@@ -11,8 +15,10 @@ class RadioPxApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Rádio PX Digital',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange)),
-      home: const Scaffold(body: Center(child: Text('Rádio PX Digital'))),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      initialRoute: AppRoutes.splash,
+      routes: {AppRoutes.splash: (_) => const SplashPage()},
     );
   }
 }
