@@ -13,6 +13,7 @@ import (
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/canal"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/config"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/geofence"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/notificacao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
@@ -37,7 +38,8 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	servicoCanais := canal.NovoServico(repositorioCanais, gerenciadorCanais, repositorioPosicoes)
 	repositorioUsuarios := usuario.NovoRepositorio(pool)
 
-	verificadorGeocerca := geofence.NovoVerificador(canal.NovoAdaptadorGeocerca(gerenciadorCanais, repositorioCanais))
+	adaptadorGeocerca := canal.NovoAdaptadorGeocerca(gerenciadorCanais, repositorioCanais, repositorioUsuarios, notificacao.NotificadorLog{})
+	verificadorGeocerca := geofence.NovoVerificador(adaptadorGeocerca)
 	servicoPosicoes := posicao.NovoServico(repositorioPosicoes, verificadorGeocerca)
 
 	authHandler := NovoAuthHandler(repositorioUsuarios, cfg.JWTSecret)

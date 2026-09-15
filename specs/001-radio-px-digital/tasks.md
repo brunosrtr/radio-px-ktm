@@ -198,11 +198,11 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T069 [P] Enviar notificação push ao motorista quando removido por geocerca, usando `dispositivo.push_token`, em `backend/internal/geofence/verificador.go` (depende de T050, T061)
-- [ ] T070 [P] Revisar `.env.example` para cobrir todas as variáveis introduzidas nas fases anteriores
-- [ ] T071 Rodar quickstart.md e validar o critério de aceite da Etapa 1 de ponta a ponta (`docker compose up`, `GET /health`)
-- [ ] T072 Auditoria final: confirmar que nenhuma tabela, log ou arquivo em disco armazena áudio, conforme o Princípio I da constituição
-- [ ] T073 [P] Avaliar particionamento mensal de `posicao` (opcional — só após todas as etapas obrigatórias concluídas, ver data-model.md)
+- [X] T069 [P] Enviar notificação push ao motorista quando removido por geocerca, usando `dispositivo.push_token`, em `backend/internal/geofence/verificador.go` (depende de T050, T061)
+- [X] T070 [P] Revisar `.env.example` para cobrir todas as variáveis introduzidas nas fases anteriores
+- [X] T071 Rodar quickstart.md e validar o critério de aceite da Etapa 1 de ponta a ponta (`docker compose up`, `GET /health`)
+- [X] T072 Auditoria final: confirmar que nenhuma tabela, log ou arquivo em disco armazena áudio, conforme o Princípio I da constituição
+- [X] T073 [P] Avaliar particionamento mensal de `posicao` (opcional — só após todas as etapas obrigatórias concluídas, ver data-model.md). Avaliado e **não implementado** nesta versão: sem volume real de produção que justifique a complexidade adicional (Princípio VI); reavaliar se o histórico de posição crescer a ponto de afetar consultas de trajeto/retenção de 90 dias.
 
 ---
 

@@ -111,3 +111,30 @@ func (r *Repositorio) RegistrarDispositivo(ctx context.Context, usuarioID, plata
 	}
 	return nil
 }
+
+// PushTokens retorna os push_token não nulos de todos os dispositivos
+// registrados do usuário (um usuário pode ter Android e iOS ao mesmo
+// tempo), usados para avisos como remoção por geocerca (FR-017).
+func (r *Repositorio) PushTokens(ctx context.Context, usuarioID string) ([]string, error) {
+	linhas, err := r.pool.Query(ctx, `
+		select push_token from dispositivo
+		where usuario_id = $1 and push_token is not null
+	`, usuarioID)
+	if err != nil {
+		return nil, fmt.Errorf("usuario: erro ao buscar push tokens: %w", err)
+	}
+	defer linhas.Close()
+
+	var tokens []string
+	for linhas.Next() {
+		var token string
+		if err := linhas.Scan(&token); err != nil {
+			return nil, fmt.Errorf("usuario: erro ao ler push token: %w", err)
+		}
+		tokens = append(tokens, token)
+	}
+	if err := linhas.Err(); err != nil {
+		return nil, fmt.Errorf("usuario: erro ao percorrer push tokens: %w", err)
+	}
+	return tokens, nil
+}

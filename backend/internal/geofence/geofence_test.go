@@ -7,9 +7,11 @@ import (
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/canal"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/geofence"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/notificacao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage/testutil"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
 )
 
 func TestEntradaRecusadaForaDoRaio(t *testing.T) {
@@ -79,7 +81,8 @@ func TestVerificadorRemoveMotoristaAoSairDoRaio(t *testing.T) {
 		t.Fatalf("erro ao registrar entrada: %v", err)
 	}
 
-	verificador := geofence.NovoVerificador(canal.NovoAdaptadorGeocerca(gerenciador, repo))
+	adaptador := canal.NovoAdaptadorGeocerca(gerenciador, repo, usuario.NovoRepositorio(pool), notificacao.NotificadorLog{})
+	verificador := geofence.NovoVerificador(adaptador)
 
 	// Posição ainda dentro do raio: não deve remover.
 	verificador.VerificarPosicao(ctx, motoristaID, lat, lon)
