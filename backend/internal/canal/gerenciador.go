@@ -17,15 +17,29 @@ func NovoGerenciador() *Gerenciador {
 }
 
 // ObterOuCriar retorna o hub do canal informado, criando-o se ainda não
-// existir em memória.
-func (g *Gerenciador) ObterOuCriar(canalID string) *Canal {
+// existir em memória. limiteParticipantes é sincronizado no hub a cada
+// chamada, refletindo edições feitas via PATCH /canais/{id}.
+func (g *Gerenciador) ObterOuCriar(canalID string, limiteParticipantes int) *Canal {
 	g.mu.Lock()
-	defer g.mu.Unlock()
-
 	c, ok := g.canais[canalID]
 	if !ok {
-		c = NovoCanal(canalID)
+		c = NovoCanal(canalID, ComLimiteParticipantes(limiteParticipantes))
 		g.canais[canalID] = c
 	}
+	g.mu.Unlock()
+
+	if ok {
+		c.DefinirLimiteParticipantes(limiteParticipantes)
+	}
 	return c
+}
+
+// Obter retorna o hub do canal informado sem criá-lo, útil para aplicar
+// atualizações (ex.: preferência de silenciamento) só quando já há uma
+// sessão ativa naquele canal.
+func (g *Gerenciador) Obter(canalID string) (*Canal, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	c, ok := g.canais[canalID]
+	return c, ok
 }

@@ -100,26 +100,26 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T029 [P] [US2] Teste de integração: criação/edição de canal valida `limite_participantes` em `{5,10,15,20}` e a constraint de geocerca completa, em `backend/internal/canal/service_test.go`
-- [ ] T030 [P] [US2] Teste de integração: `GET /canais` só retorna canal privado da própria empresa e canais compartilhados liberados para ela, em `backend/internal/canal/service_test.go`
-- [ ] T031 [P] [US2] Teste de integração: entrada em canal é recusada ao atingir o limite de participantes, em `backend/internal/canal/hub_test.go`
+- [X] T029 [P] [US2] Teste de integração: criação/edição de canal valida `limite_participantes` em `{5,10,15,20}` e a constraint de geocerca completa, em `backend/internal/canal/service_test.go`
+- [X] T030 [P] [US2] Teste de integração: `GET /canais` só retorna canal privado da própria empresa e canais compartilhados liberados para ela, em `backend/internal/canal/service_test.go`
+- [X] T031 [P] [US2] Teste de integração: entrada em canal é recusada ao atingir o limite de participantes, em `backend/internal/canal/hub_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T032 [P] [US2] Criar entidade e repositório de `Empresa` em `backend/internal/empresa/`
-- [ ] T033 [P] [US2] Criar entidade e repositório de `Usuario` em `backend/internal/usuario/`
-- [ ] T034 [US2] Implementar repositório de `Canal` (CRUD) em `backend/internal/canal/repositorio.go` (depende de T032)
-- [ ] T035 [US2] Implementar repositório de `canal_empresa` (liberar/revogar acesso de empresa parceira) em `backend/internal/canal/repositorio.go` (depende de T034)
-- [ ] T036 [US2] Implementar repositório de `preferencia_canal` (silenciar/reativar) em `backend/internal/canal/repositorio.go`
-- [ ] T037 [US2] Implementar serviço de canal: criar/editar, liberar/revogar empresa parceira, listar canais filtrados por autorização de empresa (RNF12) em `backend/internal/canal/service.go` (depende de T034, T035)
-- [ ] T038 [US2] Adicionar checagem de limite de participantes ao `entrar_canal` no hub (recusa quando `count(saiu_em is null) >= limite_participantes`) em `backend/internal/canal/hub.go` (depende de T020, T022, T037)
-- [ ] T039 [US2] Implementar saída manual (`sair_canal`, grava `motivo_saida='manual'`) e troca de canal no handler WebSocket em `backend/internal/ws/handler.go` (depende de T023)
-- [ ] T040 [US2] Implementar handlers `POST/PATCH /canais`, `POST/DELETE /canais/{id}/empresas`, `PUT /canais/{id}/preferencia`, `GET /canais` em `backend/internal/transporte/canais_handler.go` (depende de T037)
-- [ ] T041 [US2] Implementar handlers `POST /auth/login` e `GET /me` em `backend/internal/transporte/auth_handler.go` (depende de T010, T033)
-- [ ] T042 [US2] Criar seed com uma empresa e três usuários de teste em `backend/cmd/seed/main.go`
-- [ ] T043 [P] [US2] Implementar tela de login em `app/lib/features/auth/login_page.dart` (depende de T013)
-- [ ] T044 [P] [US2] Implementar tela de lista de canais com opções de silenciar, sair e alternar em `app/lib/features/canais/lista_canais_page.dart`
-- [ ] T045 [US2] Conectar login → armazenamento do token → navegação para a lista de canais em `app/lib/features/auth/` (depende de T043)
+- [X] T032 [P] [US2] Criar entidade e repositório de `Empresa` em `backend/internal/empresa/`
+- [X] T033 [P] [US2] Criar entidade e repositório de `Usuario` em `backend/internal/usuario/`
+- [X] T034 [US2] Implementar repositório de `Canal` (CRUD) em `backend/internal/canal/repositorio.go` (depende de T032)
+- [X] T035 [US2] Implementar repositório de `canal_empresa` (liberar/revogar acesso de empresa parceira) em `backend/internal/canal/repositorio.go` (depende de T034)
+- [X] T036 [US2] Implementar repositório de `preferencia_canal` (silenciar/reativar) em `backend/internal/canal/repositorio.go`
+- [X] T037 [US2] Implementar serviço de canal: criar/editar, liberar/revogar empresa parceira, listar canais filtrados por autorização de empresa (RNF12) em `backend/internal/canal/service.go` (depende de T034, T035)
+- [X] T038 [US2] Adicionar checagem de limite de participantes ao `entrar_canal` no hub (recusa quando `count(saiu_em is null) >= limite_participantes`) em `backend/internal/canal/hub.go` (depende de T020, T022, T037)
+- [X] T039 [US2] Implementar saída manual (`sair_canal`, grava `motivo_saida='manual'`) e troca de canal no handler WebSocket em `backend/internal/ws/handler.go` (depende de T023)
+- [X] T040 [US2] Implementar handlers `POST/PATCH /canais`, `POST/DELETE /canais/{id}/empresas`, `PUT /canais/{id}/preferencia`, `GET /canais` em `backend/internal/transporte/canais_handler.go` (depende de T037)
+- [X] T041 [US2] Implementar handlers `POST /auth/login` e `GET /me` em `backend/internal/transporte/auth_handler.go` (depende de T010, T033)
+- [X] T042 [US2] Criar seed com uma empresa e três usuários de teste em `backend/cmd/seed/main.go`
+- [X] T043 [P] [US2] Implementar tela de login em `app/lib/features/auth/login_page.dart` (depende de T013)
+- [X] T044 [P] [US2] Implementar tela de lista de canais com opções de silenciar, sair e alternar em `app/lib/features/canais/lista_canais_page.dart`
+- [X] T045 [US2] Conectar login → armazenamento do token → navegação para a lista de canais em `app/lib/features/auth/` (depende de T043)
 
 **Checkpoint**: User Stories 1 e 2 funcionam de forma independente e integrada.
 

@@ -26,7 +26,7 @@ func TestFilaReproduzEmOrdemDeChegadaEZeraBuffer(t *testing.T) {
 	c := NovoCanal("canal-teste", ComDuracaoMaximaTransmissao(time.Minute))
 	defer c.Fechar()
 
-	ouvinte, _ := c.Entrar("ouvinte", "Ouvinte")
+	ouvinte, _, _ := c.Entrar("ouvinte", "Ouvinte")
 
 	t1, err := c.SolicitarSlot("motorista-a", "Motorista A")
 	if err != nil {
@@ -94,7 +94,7 @@ func TestTransmissaoECortadaAutomaticamenteApos90Segundos(t *testing.T) {
 	c := NovoCanal("canal-teste", ComDuracaoMaximaTransmissao(duracaoCurta))
 	defer c.Fechar()
 
-	ouvinte, _ := c.Entrar("ouvinte", "Ouvinte")
+	ouvinte, _, _ := c.Entrar("ouvinte", "Ouvinte")
 
 	t1, err := c.SolicitarSlot("motorista-a", "Motorista A")
 	if err != nil {
@@ -110,5 +110,31 @@ func TestTransmissaoECortadaAutomaticamenteApos90Segundos(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("transmissão não foi cortada e reproduzida automaticamente após o limite de tempo")
+	}
+}
+
+func TestEntradaRecusadaAoAtingirLimiteDeParticipantes(t *testing.T) {
+	c := NovoCanal("canal-teste", ComLimiteParticipantes(2))
+	defer c.Fechar()
+
+	if _, _, err := c.Entrar("motorista-a", "Motorista A"); err != nil {
+		t.Fatalf("primeira entrada deveria ser aceita: %v", err)
+	}
+	if _, _, err := c.Entrar("motorista-b", "Motorista B"); err != nil {
+		t.Fatalf("segunda entrada deveria ser aceita: %v", err)
+	}
+	if _, _, err := c.Entrar("motorista-c", "Motorista C"); err != ErrLimiteParticipantes {
+		t.Fatalf("terceira entrada deveria ser recusada com ErrLimiteParticipantes, veio: %v", err)
+	}
+
+	// Um usuário já dentro pode reconectar (reentrar) sem contar como novo
+	// participante além do limite.
+	if _, _, err := c.Entrar("motorista-a", "Motorista A"); err != nil {
+		t.Fatalf("reentrada de participante já presente não deveria ser recusada: %v", err)
+	}
+
+	c.Sair("motorista-b")
+	if _, _, err := c.Entrar("motorista-c", "Motorista C"); err != nil {
+		t.Fatalf("entrada após vaga liberada deveria ser aceita: %v", err)
 	}
 }

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/routes.dart';
 import 'core/theme.dart';
+import 'features/auth/login_page.dart';
+import 'features/canais/lista_canais_page.dart';
 
 void main() {
   runApp(const ProviderScope(child: RadioPxApp()));
@@ -17,8 +19,11 @@ class RadioPxApp extends StatelessWidget {
       title: 'Rádio PX Digital',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      initialRoute: AppRoutes.splash,
-      routes: {AppRoutes.splash: (_) => const SplashPage()},
+      initialRoute: AppRoutes.login,
+      routes: {
+        AppRoutes.login: (_) => const LoginPage(),
+        AppRoutes.canais: (_) => const ListaCanaisPage(),
+      },
     );
   }
 }

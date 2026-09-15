@@ -6,6 +6,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/auth"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/canal"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
 )
 
 // mensagemEntrada é o envelope das mensagens de controle recebidas do
@@ -33,13 +35,14 @@ type mensagemSaida struct {
 // do protocolo para o Gerenciador de canais.
 type Handler struct {
 	gerenciador *canal.Gerenciador
+	servico     *canal.Servico
 	repositorio *canal.Repositorio
+	usuarios    *usuario.Repositorio
 }
 
-// NovoHandler cria o handler de WebSocket sobre o gerenciador e o
-// repositório de canais informados.
-func NovoHandler(gerenciador *canal.Gerenciador, repositorio *canal.Repositorio) *Handler {
-	return &Handler{gerenciador: gerenciador, repositorio: repositorio}
+// NovoHandler cria o handler de WebSocket sobre as dependências informadas.
+func NovoHandler(gerenciador *canal.Gerenciador, servico *canal.Servico, repositorio *canal.Repositorio, usuarios *usuario.Repositorio) *Handler {
+	return &Handler{gerenciador: gerenciador, servico: servico, repositorio: repositorio, usuarios: usuarios}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -58,13 +61,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	nome, err := h.repositorio.NomeUsuario(ctx, claims.UsuarioID)
+	u, err := h.usuarios.ObterPorID(ctx, claims.UsuarioID)
 	if err != nil {
 		_ = conn.Close(websocket.StatusInternalError, "erro ao carregar usuário")
 		return
 	}
 
-	s := &sessao{handler: h, conn: conn, usuarioID: claims.UsuarioID, nome: nome}
+	s := &sessao{handler: h, conn: conn, usuarioID: claims.UsuarioID, empresaID: claims.EmpresaID, nome: u.Nome}
 	defer s.encerrar()
 
 	for {
@@ -89,6 +92,7 @@ type sessao struct {
 	handler   *Handler
 	conn      *websocket.Conn
 	usuarioID string
+	empresaID string
 	nome      string
 
 	escritaMu sync.Mutex
@@ -143,15 +147,38 @@ func (s *sessao) processarMensagem(ctx context.Context, dados []byte) {
 func (s *sessao) entrarCanal(ctx context.Context, canalID string) {
 	s.sairCanalAtual("manual")
 
-	c := s.handler.gerenciador.ObterOuCriar(canalID)
+	canalDB, err := s.handler.servico.ObterParaEntrada(ctx, canalID, s.empresaID)
+	if err != nil {
+		switch {
+		case errors.Is(err, canal.ErrNaoEncontrado):
+			s.enviarErro(ctx, "nao_encontrado", "canal não encontrado")
+		case errors.Is(err, canal.ErrSemPermissao):
+			s.enviarErro(ctx, "sem_permissao", "empresa não autorizada a acessar este canal")
+		default:
+			log.Printf("ws: erro ao buscar canal para entrada: %v", err)
+			s.enviarErro(ctx, "erro_interno", "não foi possível validar o canal")
+		}
+		return
+	}
+
+	c := s.handler.gerenciador.ObterOuCriar(canalID, canalDB.LimiteParticipantes)
+
+	membro, total, err := c.Entrar(s.usuarioID, s.nome)
+	if err != nil {
+		s.enviarErro(ctx, "limite_atingido", "canal já está com o número máximo de participantes")
+		return
+	}
 
 	if err := s.handler.repositorio.RegistrarEntrada(ctx, canalID, s.usuarioID); err != nil {
 		log.Printf("ws: erro ao registrar entrada: %v", err)
+		c.Sair(s.usuarioID)
 		s.enviarErro(ctx, "erro_interno", "não foi possível registrar entrada no canal")
 		return
 	}
 
-	membro, total := c.Entrar(s.usuarioID, s.nome)
+	if silenciado, err := s.handler.repositorio.ObterPreferencia(ctx, s.usuarioID, canalID); err == nil && silenciado {
+		membro.DefinirSilenciado(true)
+	}
 
 	ctxMembro, cancelar := context.WithCancel(context.Background())
 

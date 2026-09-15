@@ -6,6 +6,8 @@ package testutil
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"testing"
 	"time"
@@ -42,4 +44,40 @@ func AbrirPool(t *testing.T) *storage.Pool {
 	}
 
 	return pool
+}
+
+// CriarEmpresa insere uma empresa de teste com CNPJ único e devolve seu ID.
+func CriarEmpresa(t *testing.T, pool *storage.Pool) string {
+	t.Helper()
+	var id string
+	err := pool.QueryRow(context.Background(), `
+		insert into empresa (razao_social, cnpj) values ($1, $2)
+		returning id
+	`, "Empresa Teste "+aleatorio(), aleatorio()[:14]).Scan(&id)
+	if err != nil {
+		t.Fatalf("erro ao criar empresa de teste: %v", err)
+	}
+	return id
+}
+
+// CriarUsuario insere um usuário de teste (login único) na empresa
+// informada e devolve seu ID.
+func CriarUsuario(t *testing.T, pool *storage.Pool, empresaID, papel string) string {
+	t.Helper()
+	var id string
+	err := pool.QueryRow(context.Background(), `
+		insert into usuario (empresa_id, nome, login, senha_hash, papel)
+		values ($1, 'Usuário Teste', $2, 'hash', $3)
+		returning id
+	`, empresaID, "login-"+aleatorio(), papel).Scan(&id)
+	if err != nil {
+		t.Fatalf("erro ao criar usuário de teste: %v", err)
+	}
+	return id
+}
+
+func aleatorio() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }

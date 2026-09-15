@@ -29,6 +29,9 @@ var (
 	// ErrTransmissaoInexistente indica que a transmissão já foi finalizada,
 	// cortada por limite de tempo, ou nunca existiu nesta conexão.
 	ErrTransmissaoInexistente = errors.New("canal: transmissão inexistente ou já encerrada")
+	// ErrLimiteParticipantes indica que o canal já está com o número máximo
+	// de participantes simultâneos permitido (FR-023).
+	ErrLimiteParticipantes = errors.New("canal: limite de participantes atingido")
 )
 
 // Evento é o envelope genérico enviado do hub para um membro — controle
@@ -47,12 +50,13 @@ type Canal struct {
 
 	duracaoMaximaTransmissao time.Duration
 
-	mu                 sync.Mutex
-	membros            map[string]*Membro
-	transmissoesAtivas map[string]*Transmissao
-	filaTransmissoes   []*Transmissao
-	fechado            bool
-	cond               *sync.Cond
+	mu                  sync.Mutex
+	limiteParticipantes int
+	membros             map[string]*Membro
+	transmissoesAtivas  map[string]*Transmissao
+	filaTransmissoes    []*Transmissao
+	fechado             bool
+	cond                *sync.Cond
 }
 
 // Opcao customiza a criação de um Canal — usada por testes para encurtar
@@ -62,6 +66,12 @@ type Opcao func(*Canal)
 // ComDuracaoMaximaTransmissao substitui o limite de 90s padrão.
 func ComDuracaoMaximaTransmissao(d time.Duration) Opcao {
 	return func(c *Canal) { c.duracaoMaximaTransmissao = d }
+}
+
+// ComLimiteParticipantes define o limite de participantes simultâneos
+// (FR-022/FR-023). Zero (padrão) significa sem limite.
+func ComLimiteParticipantes(n int) Opcao {
+	return func(c *Canal) { c.limiteParticipantes = n }
 }
 
 // NovoCanal cria o hub de um canal e inicia sua goroutine consumidora.
@@ -82,16 +92,44 @@ func NovoCanal(id string, opcoes ...Opcao) *Canal {
 	return c
 }
 
+// DefinirLimiteParticipantes atualiza o limite de participantes simultâneos
+// — usado para manter o hub em memória sincronizado após uma edição do canal
+// (PATCH /canais/{id}).
+func (c *Canal) DefinirLimiteParticipantes(n int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.limiteParticipantes = n
+}
+
 // Entrar registra um novo membro no canal e retorna o total de participantes
-// após a entrada. Checagens de limite de participantes (US2) e geocerca
-// (US3) são responsabilidade de camadas superiores nesta fase.
-func (c *Canal) Entrar(usuarioID, nome string) (membro *Membro, participantes int) {
+// após a entrada. Recusa com ErrLimiteParticipantes quando o canal já está
+// no limite (FR-023); geocerca (US3) é responsabilidade de camadas
+// superiores.
+func (c *Canal) Entrar(usuarioID, nome string) (membro *Membro, participantes int, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if _, jaEsta := c.membros[usuarioID]; !jaEsta &&
+		c.limiteParticipantes > 0 && len(c.membros) >= c.limiteParticipantes {
+		return nil, 0, ErrLimiteParticipantes
+	}
+
 	m := novoMembro(usuarioID, nome)
 	c.membros[usuarioID] = m
-	return m, len(c.membros)
+	return m, len(c.membros), nil
+}
+
+// DefinirSilenciado atualiza a preferência de silenciamento do membro
+// atualmente conectado, se houver (FR-019). Não é erro chamar para um
+// usuário sem conexão ativa no canal — a preferência em si vive no banco e é
+// aplicada de novo na próxima entrada.
+func (c *Canal) DefinirSilenciado(usuarioID string, silenciado bool) {
+	c.mu.Lock()
+	m, ok := c.membros[usuarioID]
+	c.mu.Unlock()
+	if ok {
+		m.DefinirSilenciado(silenciado)
+	}
 }
 
 // Sair remove um membro do canal.

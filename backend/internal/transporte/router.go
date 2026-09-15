@@ -13,12 +13,14 @@ import (
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/canal"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/config"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/ws"
 )
 
-// NovoRoteador monta o roteador HTTP base do backend. /health fica fora do
-// grupo autenticado de propósito, pois é o critério de aceite da Etapa 1
-// (fundação) e não deve depender de token.
+// NovoRoteador monta o roteador HTTP base do backend. /health e
+// /auth/login ficam fora do grupo autenticado de propósito: o primeiro é o
+// critério de aceite da Etapa 1 (fundação), o segundo é como se obtém o
+// token em primeiro lugar.
 func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -28,10 +30,27 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 
 	gerenciadorCanais := canal.NovoGerenciador()
 	repositorioCanais := canal.NovoRepositorio(pool)
-	wsHandler := ws.NovoHandler(gerenciadorCanais, repositorioCanais)
+	servicoCanais := canal.NovoServico(repositorioCanais, gerenciadorCanais)
+	repositorioUsuarios := usuario.NovoRepositorio(pool)
+
+	authHandler := NovoAuthHandler(repositorioUsuarios, cfg.JWTSecret)
+	canaisHandler := NovoCanaisHandler(servicoCanais)
+	wsHandler := ws.NovoHandler(gerenciadorCanais, servicoCanais, repositorioCanais, repositorioUsuarios)
+
+	r.Post("/auth/login", authHandler.Login)
 
 	r.Group(func(r chi.Router) {
 		r.Use(auth.Middleware(cfg.JWTSecret))
+
+		r.Get("/me", authHandler.Me)
+
+		r.Get("/canais", canaisHandler.Listar)
+		r.Post("/canais", canaisHandler.Criar)
+		r.Patch("/canais/{id}", canaisHandler.Editar)
+		r.Post("/canais/{id}/empresas", canaisHandler.LiberarEmpresa)
+		r.Delete("/canais/{id}/empresas/{empresaId}", canaisHandler.RevogarEmpresa)
+		r.Put("/canais/{id}/preferencia", canaisHandler.DefinirPreferencia)
+
 		r.Get("/ws", wsHandler.ServeHTTP)
 	})
 
