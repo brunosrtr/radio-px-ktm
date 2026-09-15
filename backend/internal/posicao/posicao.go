@@ -17,6 +17,10 @@ var ErrNaoEncontrada = errors.New("posicao: nenhuma posição registrada para o 
 // ponto sem capturado_em (contracts/rest-api.md).
 var ErrLoteInvalido = errors.New("posicao: lote inválido")
 
+// ErrSemPermissao indica uma tentativa de consultar posições de outra
+// empresa, ou de um motorista que não pertence à empresa do admin (FR-026).
+var ErrSemPermissao = errors.New("posicao: sem permissão")
+
 // Ponto é uma posição bruta recebida do app (FR-024, FR-028).
 type Ponto struct {
 	Latitude       float64
@@ -34,4 +38,22 @@ type Atual struct {
 	VelocidadeKmh *float64
 	CapturadoEm   time.Time
 	AtualizadoEm  time.Time
+}
+
+// MotoristaPosicaoAtual é a posição atual de um motorista, já com o nome
+// para exibição no mapa do painel (FR-026).
+type MotoristaPosicaoAtual struct {
+	UsuarioID     string
+	Nome          string
+	Latitude      float64
+	Longitude     float64
+	VelocidadeKmh *float64
+	CapturadoEm   time.Time
+}
+
+// PontoTrajeto é um ponto do histórico de um motorista num período (FR-027).
+type PontoTrajeto struct {
+	Latitude    float64
+	Longitude   float64
+	CapturadoEm time.Time
 }

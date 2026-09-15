@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/auth"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 )
@@ -71,4 +73,77 @@ func (h *PosicoesHandler) Receber(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responderJSON(w, http.StatusAccepted, map[string]any{"pontos_recebidos": len(pontos)})
+}
+
+// PosicoesAtuais implementa GET /empresas/{id}/posicoes-atuais (admin) — só
+// retorna dados quando {id} é a própria empresa do admin (FR-026).
+func (h *PosicoesHandler) PosicoesAtuais(w http.ResponseWriter, r *http.Request) {
+	claims, ok := exigirAdmin(w, r)
+	if !ok {
+		return
+	}
+
+	motoristas, err := h.servico.PosicoesAtuaisPorEmpresa(r.Context(), claims.EmpresaID, chi.URLParam(r, "id"))
+	if err != nil {
+		if errors.Is(err, posicao.ErrSemPermissao) {
+			responderErro(w, http.StatusForbidden, "sem_permissao", "acesso restrito à própria empresa")
+			return
+		}
+		responderErro(w, http.StatusInternalServerError, "erro_interno", "não foi possível consultar as posições")
+		return
+	}
+
+	resultado := make([]map[string]any, 0, len(motoristas))
+	for _, m := range motoristas {
+		resultado = append(resultado, map[string]any{
+			"usuario_id":     m.UsuarioID,
+			"nome":           m.Nome,
+			"latitude":       m.Latitude,
+			"longitude":      m.Longitude,
+			"velocidade_kmh": m.VelocidadeKmh,
+			"capturado_em":   m.CapturadoEm,
+		})
+	}
+	responderJSON(w, http.StatusOK, map[string]any{"motoristas": resultado})
+}
+
+// Trajeto implementa GET /motoristas/{id}/trajeto?de=&ate= (admin) — {id}
+// precisa pertencer à mesma empresa do admin autenticado (FR-027). Um
+// período sem dados retorna 200 com trajeto vazio, nunca erro.
+func (h *PosicoesHandler) Trajeto(w http.ResponseWriter, r *http.Request) {
+	claims, ok := exigirAdmin(w, r)
+	if !ok {
+		return
+	}
+
+	de, err := time.Parse(time.RFC3339, r.URL.Query().Get("de"))
+	if err != nil {
+		responderErro(w, http.StatusBadRequest, "mensagem_invalida", "parâmetro 'de' ausente ou fora do formato RFC3339")
+		return
+	}
+	ate, err := time.Parse(time.RFC3339, r.URL.Query().Get("ate"))
+	if err != nil {
+		responderErro(w, http.StatusBadRequest, "mensagem_invalida", "parâmetro 'ate' ausente ou fora do formato RFC3339")
+		return
+	}
+
+	pontos, err := h.servico.TrajetoDoMotorista(r.Context(), claims.EmpresaID, chi.URLParam(r, "id"), de, ate)
+	if err != nil {
+		if errors.Is(err, posicao.ErrSemPermissao) {
+			responderErro(w, http.StatusForbidden, "sem_permissao", "motorista não pertence à sua empresa")
+			return
+		}
+		responderErro(w, http.StatusInternalServerError, "erro_interno", "não foi possível consultar o trajeto")
+		return
+	}
+
+	trajeto := make([]map[string]any, 0, len(pontos))
+	for _, p := range pontos {
+		trajeto = append(trajeto, map[string]any{
+			"latitude":     p.Latitude,
+			"longitude":    p.Longitude,
+			"capturado_em": p.CapturadoEm,
+		})
+	}
+	responderJSON(w, http.StatusOK, map[string]any{"trajeto": trajeto})
 }

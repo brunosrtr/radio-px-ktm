@@ -74,6 +74,60 @@ func TestIngerirLoteRecusaLoteVazio(t *testing.T) {
 	}
 }
 
+func TestPosicoesAtuaisPorEmpresaRecusaEmpresaDiferente(t *testing.T) {
+	pool := testutil.AbrirPool(t)
+
+	empresaAdmin := testutil.CriarEmpresa(t, pool)
+	empresaOutra := testutil.CriarEmpresa(t, pool)
+
+	servico := posicao.NovoServico(posicao.NovoRepositorio(pool), nil)
+
+	if _, err := servico.PosicoesAtuaisPorEmpresa(context.Background(), empresaAdmin, empresaOutra); !errors.Is(err, posicao.ErrSemPermissao) {
+		t.Fatalf("esperava ErrSemPermissao ao consultar empresa diferente, veio: %v", err)
+	}
+}
+
+func TestTrajetoDoMotoristaNoPeriodoEVazioSemDados(t *testing.T) {
+	pool := testutil.AbrirPool(t)
+	ctx := context.Background()
+
+	empresaID := testutil.CriarEmpresa(t, pool)
+	motoristaID := testutil.CriarUsuario(t, pool, empresaID, "motorista")
+	motoristaSemPosicoes := testutil.CriarUsuario(t, pool, empresaID, "motorista")
+
+	repositorio := posicao.NovoRepositorio(pool)
+	servico := posicao.NovoServico(repositorio, nil)
+
+	inicio := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	lote := []posicao.Ponto{
+		{Latitude: -28.40, Longitude: -52.10, CapturadoEm: inicio},
+		{Latitude: -28.41, Longitude: -52.11, CapturadoEm: inicio.Add(10 * time.Minute)},
+		{Latitude: -28.42, Longitude: -52.12, CapturadoEm: inicio.Add(2 * time.Hour)}, // fora do período consultado
+	}
+	if err := servico.IngerirLote(ctx, motoristaID, lote); err != nil {
+		t.Fatalf("erro ao ingerir lote: %v", err)
+	}
+
+	trajeto, err := servico.TrajetoDoMotorista(ctx, empresaID, motoristaID, inicio.Add(-time.Minute), inicio.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("erro ao consultar trajeto: %v", err)
+	}
+	if len(trajeto) != 2 {
+		t.Fatalf("esperava 2 pontos no período, veio %d", len(trajeto))
+	}
+	if !trajeto[0].CapturadoEm.Before(trajeto[1].CapturadoEm) {
+		t.Fatal("trajeto deveria vir ordenado do mais antigo para o mais recente")
+	}
+
+	trajetoVazio, err := servico.TrajetoDoMotorista(ctx, empresaID, motoristaSemPosicoes, inicio.Add(-time.Hour), inicio.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("consulta sem dados não deveria retornar erro, veio: %v", err)
+	}
+	if len(trajetoVazio) != 0 {
+		t.Fatalf("esperava trajeto vazio para motorista sem posições, veio %d pontos", len(trajetoVazio))
+	}
+}
+
 func contarHistorico(t *testing.T, pool *storage.Pool, usuarioID string) int {
 	t.Helper()
 	var total int

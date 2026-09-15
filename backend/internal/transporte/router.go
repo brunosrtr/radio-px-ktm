@@ -17,6 +17,7 @@ import (
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/ws"
+	"github.com/brunosrtr/radio-px-ktm/backend/painel"
 )
 
 // NovoRoteador monta o roteador HTTP base do backend. /health e
@@ -59,9 +60,13 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 		r.Put("/canais/{id}/preferencia", canaisHandler.DefinirPreferencia)
 
 		r.Post("/posicoes", posicoesHandler.Receber)
+		r.Get("/empresas/{id}/posicoes-atuais", posicoesHandler.PosicoesAtuais)
+		r.Get("/motoristas/{id}/trajeto", posicoesHandler.Trajeto)
 
 		r.Get("/ws", wsHandler.ServeHTTP)
 	})
+
+	r.Handle("/painel/*", http.StripPrefix("/painel/", http.FileServerFS(painel.Arquivos)))
 
 	return r
 }

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Rádio PX Digital — Mapa</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+  #login { max-width: 360px; margin: 80px auto; padding: 24px; border: 1px solid #ddd; border-radius: 8px; }
+  #login input { width: 100%; padding: 8px; margin: 6px 0; box-sizing: border-box; }
+  #login button { width: 100%; padding: 10px; }
+  #erro { color: #b00020; min-height: 1.2em; }
+  #mapa { height: 100vh; width: 100%; display: none; }
+  #barra {
+    position: absolute; top: 10px; right: 10px; z-index: 1000;
+    background: white; padding: 8px 12px; border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3); display: none; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div id="login">
+    <h2>Rádio PX Digital — Mapa</h2>
+    <input id="loginInput" placeholder="Login (admin)" autocomplete="username" />
+    <input id="senhaInput" type="password" placeholder="Senha" autocomplete="current-password" />
+    <button id="entrarBtn">Entrar</button>
+    <p id="erro"></p>
+    <p><a href="trajeto.html">Consultar trajeto de um motorista →</a></p>
+  </div>
+
+  <div id="barra">Motoristas: <span id="totalMotoristas">0</span> · atualizado às <span id="horaAtualizacao">-</span></div>
+  <div id="mapa"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+    let token = null;
+    let empresaId = null;
+    let mapa = null;
+    const marcadores = {};
+
+    document.getElementById('entrarBtn').addEventListener('click', entrar);
+
+    async function entrar() {
+      const login = document.getElementById('loginInput').value.trim();
+      const senha = document.getElementById('senhaInput').value;
+      const erroEl = document.getElementById('erro');
+      erroEl.textContent = '';
+
+      try {
+        const respLogin = await fetch(API_BASE + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ login, senha }),
+        });
+        if (!respLogin.ok) throw new Error('login ou senha incorretos');
+        token = (await respLogin.json()).token;
+
+        const respMe = await fetch(API_BASE + '/me', { headers: { Authorization: 'Bearer ' + token } });
+        if (!respMe.ok) throw new Error('não foi possível carregar os dados do usuário');
+        const me = await respMe.json();
+        if (me.papel !== 'admin') throw new Error('apenas administradores podem ver o painel');
+        empresaId = me.empresa_id;
+
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('mapa').style.display = 'block';
+        document.getElementById('barra').style.display = 'block';
+
+        iniciarMapa();
+        await atualizarPosicoes();
+        setInterval(atualizarPosicoes, 10000);
+      } catch (e) {
+        erroEl.textContent = e.message;
+      }
+    }
+
+    function iniciarMapa() {
+      mapa = L.map('mapa').setView([-28.45, -52.20], 8);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; colaboradores do OpenStreetMap',
+      }).addTo(mapa);
+    }
+
+    async function atualizarPosicoes() {
+      const resp = await fetch(API_BASE + '/empresas/' + empresaId + '/posicoes-atuais', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (!resp.ok) return;
+      const dados = await resp.json();
+      const vistos = new Set();
+
+      for (const m of dados.motoristas) {
+        vistos.add(m.usuario_id);
+        const posicao = [m.latitude, m.longitude];
+        const popup = m.nome + '<br>' + (m.velocidade_kmh ?? '-') + ' km/h<br>' +
+          new Date(m.capturado_em).toLocaleString('pt-BR');
+
+        if (marcadores[m.usuario_id]) {
+          marcadores[m.usuario_id].setLatLng(posicao).setPopupContent(popup);
+        } else {
+          marcadores[m.usuario_id] = L.marker(posicao).addTo(mapa).bindPopup(popup);
+        }
+      }
+
+      for (const id of Object.keys(marcadores)) {
+        if (!vistos.has(id)) {
+          mapa.removeLayer(marcadores[id]);
+          delete marcadores[id];
+        }
+      }
+
+      document.getElementById('totalMotoristas').textContent = dados.motoristas.length;
+      document.getElementById('horaAtualizacao').textContent = new Date().toLocaleTimeString('pt-BR');
+    }
+  </script>
+</body>
+</html>

@@ -3,6 +3,7 @@ package posicao
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/geofence"
 )
@@ -48,4 +49,28 @@ func (s *Servico) IngerirLote(ctx context.Context, usuarioID string, pontos []Po
 	}
 
 	return nil
+}
+
+// PosicoesAtuaisPorEmpresa retorna a posição atual dos motoristas de
+// empresaAlvoID, mas só quando ela é a mesma empresa do solicitante — nunca
+// a de outra empresa (FR-026).
+func (s *Servico) PosicoesAtuaisPorEmpresa(ctx context.Context, empresaSolicitanteID, empresaAlvoID string) ([]MotoristaPosicaoAtual, error) {
+	if empresaSolicitanteID != empresaAlvoID {
+		return nil, ErrSemPermissao
+	}
+	return s.repositorio.PosicoesAtuaisPorEmpresa(ctx, empresaAlvoID)
+}
+
+// TrajetoDoMotorista retorna o trajeto de um motorista no período
+// informado, desde que ele pertença à mesma empresa do administrador
+// autenticado (FR-027).
+func (s *Servico) TrajetoDoMotorista(ctx context.Context, empresaAdminID, motoristaID string, de, ate time.Time) ([]PontoTrajeto, error) {
+	pertence, err := s.repositorio.MotoristaPertenceAEmpresa(ctx, motoristaID, empresaAdminID)
+	if err != nil {
+		return nil, err
+	}
+	if !pertence {
+		return nil, ErrSemPermissao
+	}
+	return s.repositorio.Trajeto(ctx, motoristaID, de, ate)
 }

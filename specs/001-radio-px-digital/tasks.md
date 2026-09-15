@@ -181,16 +181,16 @@ Conforme plan.md: `backend/` (Go — API, hub WebSocket, painel web) e `app/`
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T062 [P] [US5] Teste de integração: `GET /empresas/{id}/posicoes-atuais` retorna 403 quando `{id}` não é a empresa do admin autenticado, em `backend/internal/posicao/service_test.go`
-- [ ] T063 [P] [US5] Teste de integração: `GET /motoristas/{id}/trajeto` retorna o trajeto no período informado e uma lista vazia (sem erro) quando não há dados, em `backend/internal/posicao/service_test.go`
+- [X] T062 [P] [US5] Teste de integração: `GET /empresas/{id}/posicoes-atuais` retorna 403 quando `{id}` não é a empresa do admin autenticado, em `backend/internal/posicao/service_test.go`
+- [X] T063 [P] [US5] Teste de integração: `GET /motoristas/{id}/trajeto` retorna o trajeto no período informado e uma lista vazia (sem erro) quando não há dados, em `backend/internal/posicao/service_test.go`
 
 ### Implementation for User Story 5
 
-- [ ] T064 [US5] Implementar consulta de posições atuais por empresa em `backend/internal/posicao/service.go` (depende de T055)
-- [ ] T065 [US5] Implementar consulta de trajeto por motorista e período em `backend/internal/posicao/service.go` (depende de T055)
-- [ ] T066 [US5] Implementar handlers `GET /empresas/{id}/posicoes-atuais` e `GET /motoristas/{id}/trajeto` em `backend/internal/transporte/posicoes_handler.go` (depende de T064, T065)
-- [ ] T067 [US5] Implementar página do painel com mapa Leaflet mostrando a posição atual de cada motorista da empresa em `backend/painel/mapa.html` (depende de T066)
-- [ ] T068 [US5] Implementar consulta de trajeto no painel (seleção de motorista e período, linha do percurso no mapa) em `backend/painel/trajeto.html` (depende de T066)
+- [X] T064 [US5] Implementar consulta de posições atuais por empresa em `backend/internal/posicao/service.go` (depende de T055)
+- [X] T065 [US5] Implementar consulta de trajeto por motorista e período em `backend/internal/posicao/service.go` (depende de T055)
+- [X] T066 [US5] Implementar handlers `GET /empresas/{id}/posicoes-atuais` e `GET /motoristas/{id}/trajeto` em `backend/internal/transporte/posicoes_handler.go` (depende de T064, T065)
+- [X] T067 [US5] Implementar página do painel com mapa Leaflet mostrando a posição atual de cada motorista da empresa em `backend/painel/mapa.html` (depende de T066)
+- [X] T068 [US5] Implementar consulta de trajeto no painel (seleção de motorista e período, linha do percurso no mapa) em `backend/painel/trajeto.html` (depende de T066)
 
 **Checkpoint**: Todas as 5 user stories funcionam de forma independente e integrada — v1 funcionalmente completa.
 
