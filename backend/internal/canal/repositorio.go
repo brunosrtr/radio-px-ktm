@@ -245,13 +245,37 @@ func (r *Repositorio) PreferenciasSilenciadas(ctx context.Context, usuarioID str
 // RegistrarEntrada grava uma nova participação ativa do usuário no canal. A
 // constraint idx_participacao_ativa do banco impede duas participações
 // ativas simultâneas do mesmo usuário no mesmo canal.
+// RegistrarEntrada fecha qualquer participação ativa anterior do usuário no
+// canal antes de abrir uma nova. Isso é necessário porque uma conexão
+// anterior pode ter caído sem o servidor rodar RegistrarSaida (motorista
+// perdeu sinal, aba fechada abruptamente, processo reiniciado) — sem fechar
+// essa linha órfã primeiro, o índice único idx_participacao_ativa
+// (canal_id, usuario_id) where saiu_em is null recusaria a reentrada com um
+// erro de conflito, bloqueando o motorista de voltar ao canal.
 func (r *Repositorio) RegistrarEntrada(ctx context.Context, canalID, usuarioID string) error {
-	_, err := r.pool.Exec(ctx, `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("canal: erro ao iniciar transação de entrada: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `
+		update participacao_canal
+		set saiu_em = now(), motivo_saida = 'desconexao'
+		where canal_id = $1 and usuario_id = $2 and saiu_em is null
+	`, canalID, usuarioID); err != nil {
+		return fmt.Errorf("canal: erro ao encerrar participação anterior: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
 		insert into participacao_canal (canal_id, usuario_id)
 		values ($1, $2)
-	`, canalID, usuarioID)
-	if err != nil {
+	`, canalID, usuarioID); err != nil {
 		return fmt.Errorf("canal: erro ao registrar entrada: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("canal: erro ao confirmar entrada: %w", err)
 	}
 	return nil
 }

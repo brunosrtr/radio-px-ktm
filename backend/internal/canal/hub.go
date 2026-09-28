@@ -248,13 +248,16 @@ func (c *Canal) cortarAposLimite(t *Transmissao, duracaoMaxima time.Duration) {
 		delete(c.transmissoesAtivas, t.ID)
 		c.mu.Unlock()
 		t.finalizar()
-	case <-t.prontaCh:
+	case <-t.finalizadaCh:
 	}
 }
 
 // consumir processa a fila estritamente em ordem de chegada: só avança para
-// a próxima transmissão depois que a atual terminou de gravar e de ser
-// reproduzida a todos os destinatários (FR-05).
+// a próxima transmissão depois que a atual terminou de ser reproduzida a
+// todos os destinatários (FR-05). reproduzir já entrega cada chunk assim que
+// ele chega do remetente — não espera a gravação inteira terminar — então
+// uma transmissão começa a tocar para quem está ouvindo assim que vira a
+// cabeça da fila, ao vivo, como um rádio de verdade.
 func (c *Canal) consumir() {
 	for {
 		c.mu.Lock()
@@ -267,8 +270,6 @@ func (c *Canal) consumir() {
 		}
 		t := c.filaTransmissoes[0]
 		c.mu.Unlock()
-
-		<-t.prontaCh
 
 		c.reproduzir(t)
 
@@ -297,7 +298,12 @@ func (c *Canal) reproduzir(t *Transmissao) {
 		m.enviar(inicio)
 	}
 
-	for _, chunk := range t.Chunks() {
+	for lido := 0; ; {
+		chunk, proximoLido, ok := t.proximoChunk(lido)
+		if !ok {
+			break
+		}
+		lido = proximoLido
 		for _, m := range destinatarios {
 			m.enviar(Evento{Audio: chunk})
 		}

@@ -47,6 +47,17 @@ armazenamento local da fila offline de posições no app (`drift` **ou** `hive`)
   Princípio VI); a interface do hub é isolada (`internal/canal`) justamente
   para permitir essa evolução futura sem reescrever os handlers, caso o
   produto cresça além de uma instância.
+- **Entrega ao vivo, não em lote**: a goroutine consumidora começa a
+  distribuir cada chunk de áudio aos ouvintes assim que ele chega do
+  remetente (`Transmissao.proximoChunk` bloqueia num `sync.Cond` até haver um
+  chunk novo ou a transmissão finalizar) — não espera a gravação inteira
+  terminar para só então tocar tudo de uma vez. `inicio_reproducao` é
+  disparado assim que a transmissão vira a cabeça da fila, tipicamente antes
+  mesmo do primeiro chunk existir. Isso é o que dá a sensação de rádio PX de
+  verdade (fala e ouve quase ao mesmo tempo) em vez de mensagem de voz
+  gravada — e é exatamente o que o diagrama de sequência de
+  `contracts/websocket-protocol.md` já descrevia (`inicio_reproducao` antes
+  de `finalizar_transmissao`).
 
 ## 3. Validação de duração da transmissão no servidor, não só no app
 

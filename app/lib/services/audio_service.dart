@@ -6,6 +6,12 @@ import 'package:flutter_sound/flutter_sound.dart';
 /// Grava e reproduz voz em streaming — cada chunk Opus trafega direto entre
 /// o microfone/alto-falante e o `canal_service.dart`, sem tocar disco em
 /// nenhum momento (Princípio I da constituição, RF-08/RNF-05/RNF-06).
+///
+/// O player e o gravador abrem separados de propósito: abrir o gravador pede
+/// permissão de microfone ao navegador, que pode ficar pendente esperando o
+/// usuário decidir. Quem só quer ouvir o canal não deveria travar nisso —
+/// por isso o gravador só abre sob demanda, na primeira vez que o usuário
+/// aperta o botão de falar (`iniciarGravacao`).
 class AudioService {
   static const _codec = Codec.opusOGG;
   static const _sampleRate = 16000;
@@ -15,28 +21,56 @@ class AudioService {
   final FlutterSoundPlayer _player = FlutterSoundPlayer();
 
   StreamController<Uint8List>? _chunksGravados;
-  bool _aberto = false;
+  bool _playerAberto = false;
+  bool _recorderAberto = false;
 
-  Future<void> abrir() async {
-    if (_aberto) return;
-    await _recorder.openRecorder();
+  Future<void> abrirParaOuvir() async {
+    if (_playerAberto) return;
     await _player.openPlayer();
-    _aberto = true;
+    _playerAberto = true;
+  }
+
+  /// Destrava o áudio no navegador: o `AudioContext` criado por
+  /// `openPlayer()` nasce suspenso pela política de autoplay do Chrome e só
+  /// toca som de verdade depois de retomado dentro de uma interação real do
+  /// usuário (toque/clique) — sem isso, os eventos de fala chegam
+  /// normalmente e nada é ouvido. Seguro chamar mais de uma vez.
+  Future<void> destravarAudioNoToque() async {
+    if (!_playerAberto) return;
+    try {
+      await _player.resumePlayer();
+    } catch (_) {
+      // resumePlayer pode falhar se o contexto já estiver rodando — não é
+      // um erro que precise interromper nada.
+    }
+  }
+
+  Future<void> _abrirGravadorSeNecessario() async {
+    if (_recorderAberto) return;
+    await _recorder.openRecorder();
+    _recorderAberto = true;
   }
 
   Future<void> fechar() async {
-    if (!_aberto) return;
     await pararGravacao();
     await pararReproducao();
-    await _recorder.closeRecorder();
-    await _player.closePlayer();
-    _aberto = false;
+    if (_recorderAberto) {
+      await _recorder.closeRecorder();
+      _recorderAberto = false;
+    }
+    if (_playerAberto) {
+      await _player.closePlayer();
+      _playerAberto = false;
+    }
   }
 
-  /// Inicia a gravação e entrega cada chunk assim que é gerado, sem esperar
-  /// o fim da fala (research.md §7) — quem chama repassa cada evento do
-  /// stream ao `canal_service.dart` como frame binário.
+  /// Abre o gravador (pedindo permissão de microfone, se ainda não concedida)
+  /// e inicia a gravação, entregando cada chunk assim que é gerado, sem
+  /// esperar o fim da fala (research.md §7) — quem chama repassa cada evento
+  /// do stream ao `canal_service.dart` como frame binário.
   Future<Stream<Uint8List>> iniciarGravacao() async {
+    await _abrirGravadorSeNecessario();
+
     final controlador = StreamController<Uint8List>();
     _chunksGravados = controlador;
 

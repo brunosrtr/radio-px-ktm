@@ -13,13 +13,15 @@ import (
 type Servico struct {
 	repositorio *Repositorio
 	verificador *geofence.Verificador
+	broadcaster *Broadcaster
 }
 
 // NovoServico cria o Servico de posições. verificador pode ser nil quando
-// não há necessidade de reavaliar geocercas (ex.: testes isolados do
-// histórico de posição).
-func NovoServico(repositorio *Repositorio, verificador *geofence.Verificador) *Servico {
-	return &Servico{repositorio: repositorio, verificador: verificador}
+// não há necessidade de reavaliar geocercas, e broadcaster pode ser nil
+// quando não há painel em tempo real assinando atualizações (ex.: testes
+// isolados do histórico de posição).
+func NovoServico(repositorio *Repositorio, verificador *geofence.Verificador, broadcaster *Broadcaster) *Servico {
+	return &Servico{repositorio: repositorio, verificador: verificador, broadcaster: broadcaster}
 }
 
 // IngerirLote valida e insere um lote de posições, e reavalia a geocerca dos
@@ -46,6 +48,12 @@ func (s *Servico) IngerirLote(ctx context.Context, usuarioID string, pontos []Po
 
 	if s.verificador != nil {
 		s.verificador.VerificarPosicao(ctx, usuarioID, maisRecente.Latitude, maisRecente.Longitude)
+	}
+
+	if s.broadcaster != nil {
+		if empresaID, atual, err := s.repositorio.AtualComEmpresa(ctx, usuarioID); err == nil {
+			s.broadcaster.Publicar(empresaID, atual)
+		}
 	}
 
 	return nil

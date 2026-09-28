@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/routes.dart';
+import '../../core/theme.dart';
 import 'auth_service.dart';
 
 /// Tela de login — contas são fornecidas pela empresa, sem autocadastro
@@ -58,53 +59,115 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Rádio PX Digital',
-                    style: Theme.of(context).textTheme.headlineSmall,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppTheme.azulPrimario, Color(0xFF1C8FC7)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 40,
+                        offset: const Offset(0, 20),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: _loginController,
-                    decoration: const InputDecoration(labelText: 'Login'),
-                    textInputAction: TextInputAction.next,
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Informe o login' : null,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppTheme.azulPrimario,
+                                AppTheme.azulSecundario,
+                              ],
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '📻',
+                            style: TextStyle(fontSize: 30),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Rádio PX Digital',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Entre com a conta da sua empresa',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 28),
+                        TextFormField(
+                          controller: _loginController,
+                          decoration: const InputDecoration(labelText: 'Login'),
+                          textInputAction: TextInputAction.next,
+                          validator: (v) =>
+                              (v == null || v.isEmpty) ? 'Informe o login' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _senhaController,
+                          decoration: const InputDecoration(labelText: 'Senha'),
+                          obscureText: true,
+                          onFieldSubmitted: (_) => _entrar(),
+                          validator: (v) =>
+                              (v == null || v.isEmpty) ? 'Informe a senha' : null,
+                        ),
+                        if (_erro != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _erro!,
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _carregando ? null : _entrar,
+                            child: _carregando
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Entrar'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _senhaController,
-                    decoration: const InputDecoration(labelText: 'Senha'),
-                    obscureText: true,
-                    onFieldSubmitted: (_) => _entrar(),
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Informe a senha' : null,
-                  ),
-                  if (_erro != null) ...[
-                    const SizedBox(height: 12),
-                    Text(_erro!, style: const TextStyle(color: Colors.red)),
-                  ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _carregando ? null : _entrar,
-                    child: _carregando
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Entrar'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

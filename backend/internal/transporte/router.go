@@ -29,6 +29,7 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(corsMiddleware)
 
 	r.Get("/health", handlerHealth(pool))
 
@@ -40,12 +41,14 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 
 	adaptadorGeocerca := canal.NovoAdaptadorGeocerca(gerenciadorCanais, repositorioCanais, repositorioUsuarios, notificacao.NotificadorLog{})
 	verificadorGeocerca := geofence.NovoVerificador(adaptadorGeocerca)
-	servicoPosicoes := posicao.NovoServico(repositorioPosicoes, verificadorGeocerca)
+	broadcasterPosicoes := posicao.NovoBroadcaster()
+	servicoPosicoes := posicao.NovoServico(repositorioPosicoes, verificadorGeocerca, broadcasterPosicoes)
 
 	authHandler := NovoAuthHandler(repositorioUsuarios, cfg.JWTSecret)
 	canaisHandler := NovoCanaisHandler(servicoCanais)
 	posicoesHandler := NovoPosicoesHandler(servicoPosicoes)
 	wsHandler := ws.NovoHandler(gerenciadorCanais, servicoCanais, repositorioCanais, repositorioUsuarios)
+	painelWsHandler := ws.NovoPainelHandler(broadcasterPosicoes)
 
 	r.Post("/auth/login", authHandler.Login)
 
@@ -66,11 +69,30 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 		r.Get("/motoristas/{id}/trajeto", posicoesHandler.Trajeto)
 
 		r.Get("/ws", wsHandler.ServeHTTP)
+		r.Get("/ws/painel", painelWsHandler.ServeHTTP)
 	})
 
 	r.Handle("/painel/*", http.StripPrefix("/painel/", http.FileServerFS(painel.Arquivos)))
 
 	return r
+}
+
+// corsMiddleware libera chamadas de outras origens (painel/app servidos de
+// outra porta em desenvolvimento). Seguro com Access-Control-Allow-Origin: *
+// porque a API autentica por Bearer token no header, nunca por cookie.
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func handlerHealth(pool *storage.Pool) http.HandlerFunc {

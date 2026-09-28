@@ -52,7 +52,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := websocket.Accept(w, r, nil)
+	conn, err := websocket.Accept(w, r, opcoesAccept())
 	if err != nil {
 		log.Printf("ws: erro no upgrade: %v", err)
 		return

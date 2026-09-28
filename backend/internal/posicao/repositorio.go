@@ -116,6 +116,25 @@ func (r *Repositorio) PosicoesAtuaisPorEmpresa(ctx context.Context, empresaID st
 	return motoristas, nil
 }
 
+// AtualComEmpresa busca a posição atual de um usuário junto com seu nome e
+// empresa — usado para montar o evento de broadcast em tempo real após
+// IngerirLote, sem exigir que o chamador já tenha esses dados em mãos.
+func (r *Repositorio) AtualComEmpresa(ctx context.Context, usuarioID string) (empresaID string, atual MotoristaPosicaoAtual, err error) {
+	err = r.pool.QueryRow(ctx, `
+		select u.empresa_id, u.id, u.nome, pa.latitude, pa.longitude, pa.velocidade_kmh, pa.capturado_em
+		from posicao_atual pa
+		join usuario u on u.id = pa.usuario_id
+		where pa.usuario_id = $1
+	`, usuarioID).Scan(&empresaID, &atual.UsuarioID, &atual.Nome, &atual.Latitude, &atual.Longitude, &atual.VelocidadeKmh, &atual.CapturadoEm)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", MotoristaPosicaoAtual{}, ErrNaoEncontrada
+	}
+	if err != nil {
+		return "", MotoristaPosicaoAtual{}, fmt.Errorf("posicao: erro ao buscar posição atual com empresa: %w", err)
+	}
+	return empresaID, atual, nil
+}
+
 // MotoristaPertenceAEmpresa indica se o usuário informado pertence à
 // empresa informada — usado para restringir a consulta de trajeto.
 func (r *Repositorio) MotoristaPertenceAEmpresa(ctx context.Context, usuarioID, empresaID string) (bool, error) {

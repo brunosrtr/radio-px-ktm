@@ -52,6 +52,13 @@ class CanalService {
       onDone: () => _eventos?.close(),
       onError: (Object erro) => _eventos?.addError(erro),
     );
+
+    // Sem isso, um `entrarCanal` chamado logo em seguida pode ser enviado
+    // antes do handshake terminar — no navegador isso derruba a mensagem
+    // silenciosamente (WebSocket ainda em CONNECTING), então o servidor
+    // nunca registra a entrada e qualquer ação seguinte (ex.: solicitar
+    // slot) volta com `erro: sem_permissao`.
+    await _canal!.ready;
   }
 
   void _processarMensagemRecebida(dynamic mensagem) {

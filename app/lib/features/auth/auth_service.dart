@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 
 import '../../core/env.dart';
 import '../../core/http_client.dart';
@@ -22,7 +22,7 @@ class AuthService {
         'login': login,
         'senha': senha,
         'dispositivo': {
-          'plataforma': Platform.isIOS ? 'ios' : 'android',
+          'plataforma': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
           'versao_app': Env.appVersion,
         },
       },

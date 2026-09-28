@@ -19,7 +19,7 @@ func TestIngerirLoteInsereHistoricoEAtualizaPosicaoAtualCondicionalmente(t *test
 	motoristaID := testutil.CriarUsuario(t, pool, empresaID, "motorista")
 
 	repositorio := posicao.NovoRepositorio(pool)
-	servico := posicao.NovoServico(repositorio, nil)
+	servico := posicao.NovoServico(repositorio, nil, nil)
 
 	agora := time.Now().UTC().Truncate(time.Second)
 
@@ -67,7 +67,7 @@ func TestIngerirLoteInsereHistoricoEAtualizaPosicaoAtualCondicionalmente(t *test
 
 func TestIngerirLoteRecusaLoteVazio(t *testing.T) {
 	pool := testutil.AbrirPool(t)
-	servico := posicao.NovoServico(posicao.NovoRepositorio(pool), nil)
+	servico := posicao.NovoServico(posicao.NovoRepositorio(pool), nil, nil)
 
 	if err := servico.IngerirLote(context.Background(), "usuario-inexistente", nil); !errors.Is(err, posicao.ErrLoteInvalido) {
 		t.Fatalf("esperava ErrLoteInvalido para lote vazio, veio: %v", err)
@@ -80,7 +80,7 @@ func TestPosicoesAtuaisPorEmpresaRecusaEmpresaDiferente(t *testing.T) {
 	empresaAdmin := testutil.CriarEmpresa(t, pool)
 	empresaOutra := testutil.CriarEmpresa(t, pool)
 
-	servico := posicao.NovoServico(posicao.NovoRepositorio(pool), nil)
+	servico := posicao.NovoServico(posicao.NovoRepositorio(pool), nil, nil)
 
 	if _, err := servico.PosicoesAtuaisPorEmpresa(context.Background(), empresaAdmin, empresaOutra); !errors.Is(err, posicao.ErrSemPermissao) {
 		t.Fatalf("esperava ErrSemPermissao ao consultar empresa diferente, veio: %v", err)
@@ -96,7 +96,7 @@ func TestTrajetoDoMotoristaNoPeriodoEVazioSemDados(t *testing.T) {
 	motoristaSemPosicoes := testutil.CriarUsuario(t, pool, empresaID, "motorista")
 
 	repositorio := posicao.NovoRepositorio(pool)
-	servico := posicao.NovoServico(repositorio, nil)
+	servico := posicao.NovoServico(repositorio, nil, nil)
 
 	inicio := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 	lote := []posicao.Ponto{

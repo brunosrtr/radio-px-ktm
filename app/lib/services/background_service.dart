@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 /// Mantém o processo do app vivo em segundo plano no Android via um
@@ -37,8 +38,11 @@ class BackgroundService {
     );
   }
 
-  /// Inicia o foreground service, se ainda não estiver rodando.
+  /// Inicia o foreground service, se ainda não estiver rodando. No-op no
+  /// Flutter Web: não existe processo em segundo plano fora da aba do
+  /// navegador, então não há o que sustentar.
   static Future<void> iniciar() async {
+    if (kIsWeb) return;
     _inicializar();
     if (await FlutterForegroundTask.isRunningService) return;
 
@@ -49,7 +53,10 @@ class BackgroundService {
     );
   }
 
-  static Future<void> parar() => FlutterForegroundTask.stopService();
+  static Future<void> parar() {
+    if (kIsWeb) return Future.value();
+    return FlutterForegroundTask.stopService();
+  }
 }
 
 @pragma('vm:entry-point')

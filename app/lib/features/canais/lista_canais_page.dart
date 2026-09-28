@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/http_client.dart';
+import '../../core/theme.dart';
 import 'canal_ativo_page.dart';
 
 /// Lista de canais autorizados para a empresa do motorista, com opção de
@@ -72,6 +73,13 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
     );
   }
 
+  String _iniciais(String nome) {
+    final partes = nome.trim().split(RegExp(r'\s+'));
+    final a = partes.isNotEmpty && partes[0].isNotEmpty ? partes[0][0] : '';
+    final b = partes.length > 1 && partes[1].isNotEmpty ? partes[1][0] : '';
+    return (a + b).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,27 +106,74 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
 
     return RefreshIndicator(
       onRefresh: _carregar,
-      child: ListView.separated(
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _canais.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final canal = _canais[index];
+          final nome = canal['nome'] as String;
           final silenciado = canal['silenciado'] as bool;
-          return ListTile(
-            title: Text(canal['nome'] as String),
-            subtitle: Text(
-              '${canal['participantes_atual']}/${canal['limite_participantes']} participantes'
-              '${(canal['geocerca_ativa'] as bool) ? ' • geocerca ativa' : ''}',
-            ),
-            leading: IconButton(
-              icon: Icon(
-                silenciado ? Icons.notifications_off : Icons.notifications_active,
+          final geocerca = canal['geocerca_ativa'] as bool;
+          final atual = canal['participantes_atual'];
+          final limite = canal['limite_participantes'];
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            child: Material(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(14),
+              child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 6,
               ),
-              tooltip: silenciado ? 'Reativar canal' : 'Silenciar canal',
-              onPressed: () => _alternarSilenciado(canal),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              leading: CircleAvatar(
+                radius: 24,
+                backgroundColor: AppTheme.corDoAvatar(nome),
+                child: Text(
+                  _iniciais(nome),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              title: Text(nome, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Row(
+                children: [
+                  Icon(
+                    Icons.group_outlined,
+                    size: 14,
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                  const SizedBox(width: 4),
+                  Text('$atual/$limite'),
+                  if (geocerca) ...[
+                    const SizedBox(width: 10),
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                    const SizedBox(width: 2),
+                    const Text('geocerca'),
+                  ],
+                ],
+              ),
+              trailing: IconButton(
+                icon: Icon(
+                  silenciado ? Icons.notifications_off : Icons.notifications_active,
+                  color: silenciado ? Colors.grey : AppTheme.azulSecundario,
+                ),
+                tooltip: silenciado ? 'Reativar canal' : 'Silenciar canal',
+                onPressed: () => _alternarSilenciado(canal),
+              ),
+              onTap: () => _entrarNoCanal(canal),
+              ),
             ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _entrarNoCanal(canal),
           );
         },
       ),
