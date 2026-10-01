@@ -99,6 +99,9 @@ func TestVerificadorRemoveMotoristaAoSairDoRaio(t *testing.T) {
 
 	select {
 	case evento := <-membro.Eventos:
+		for evento.Tipo == "estado_canal" {
+			evento = <-membro.Eventos
+		}
 		if evento.Tipo != "removido_canal" || evento.Dados["motivo"] != "geocerca" {
 			t.Fatalf("esperava removido_canal com motivo geocerca, veio: %+v", evento)
 		}

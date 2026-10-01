@@ -294,3 +294,24 @@ de aceite e aguardar confirmação antes de avançar.
 - Commitar após cada tarefa ou grupo lógico de tarefas (Princípio "commits pequenos e descritivos" da constituição)
 - Parar em qualquer checkpoint para validar a story de forma independente antes de seguir
 - Evitar: tarefas vagas, conflitos no mesmo arquivo, dependências entre stories que quebrem a independência
+
+
+## Etapa de estabilização do PTT — revisão de 2026-09-29
+
+As marcações T001–T073 registram a implementação anterior; não equivalem a
+aceite completo em Android/iOS. Esta etapa corrige o ciclo de voz sobre a
+main, preservando a política de fila do contrato atual. Requisitos:
+FR-003, FR-004, FR-005, FR-007 e FR-008.
+
+- [X] T074 Criar testes de regressão do corte, captura duplicada, cancelamento e descarte em `backend/internal/canal/estabilizacao_test.go`
+- [X] T075 Corrigir encerramento/cancelamento no hub e publicar `estado_canal` e `transmissao_encerrada`
+- [X] T076 Integrar `cancelar_transmissao` ao handler WebSocket e cobrir o protocolo com teste de integração
+- [X] T077 Extrair o ciclo do botão/microfone para `app/lib/services/ptt_controller.dart` e integrar à tela do canal
+- [X] T078 Criar testes do PTT para autorização tardia, abertura assíncrona, corte local/remoto e desconexão em `app/test/ptt_controller_test.dart`
+- [X] T079 Validar suíte Go com detector de corrida e PostgreSQL real (`go test -race -p 1 ./... -count=1`)
+- [ ] T080 Executar testes Flutter e análise estática com SDK compatível instalado
+- [ ] T081 Demonstrar o aceite em dois celulares: transmissão, soltura rápida, corte de 90s e queda de conexão
+
+Próximas etapas permanecem separadas: configuração nativa e segundo plano,
+reconexão automática, correções de localização/geocerca e gestão de canais.
+O detalhamento e as evidências desta etapa estão em `estabilizacao-ptt.md`.

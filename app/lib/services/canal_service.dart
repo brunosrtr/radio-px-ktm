@@ -58,7 +58,7 @@ class CanalService {
     // silenciosamente (WebSocket ainda em CONNECTING), então o servidor
     // nunca registra a entrada e qualquer ação seguinte (ex.: solicitar
     // slot) volta com `erro: sem_permissao`.
-    await _canal!.ready;
+    await _canal!.ready.timeout(const Duration(seconds: 10));
   }
 
   void _processarMensagemRecebida(dynamic mensagem) {
@@ -90,6 +90,11 @@ class CanalService {
     {'transmissao_id': transmissaoId},
   );
 
+  void cancelarTransmissao(String transmissaoId) => _enviarControle(
+    'cancelar_transmissao',
+    {'transmissao_id': transmissaoId},
+  );
+
   void ping() => _enviarControle('ping', const {});
 
   void enviarChunkAudio(Uint8List chunk) => _canal?.sink.add(chunk);
@@ -100,7 +105,7 @@ class CanalService {
 
   Future<void> desconectar() async {
     await _canal?.sink.close();
-    await _eventos?.close();
+    if (_eventos != null && !_eventos!.isClosed) await _eventos!.close();
     _canal = null;
     _eventos = null;
   }

@@ -1,6 +1,7 @@
 package canal
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -10,7 +11,7 @@ func TestFilaAceitaAte10MensagensERecusaA11(t *testing.T) {
 	defer c.Fechar()
 
 	for i := 0; i < CapacidadeFila; i++ {
-		if _, err := c.SolicitarSlot("remetente", "Remetente"); err != nil {
+		if _, err := c.SolicitarSlot(fmt.Sprint(i), "Remetente"); err != nil {
 			t.Fatalf("solicitação %d deveria ter sido aceita, veio erro: %v", i+1, err)
 		}
 	}
@@ -64,6 +65,9 @@ func TestFilaReproduzEmOrdemDeChegadaEZeraBuffer(t *testing.T) {
 	for i, exp := range esperado {
 		select {
 		case evento := <-ouvinte.Eventos:
+			for evento.Tipo == "estado_canal" {
+				evento = <-ouvinte.Eventos
+			}
 			if exp.audio != "" {
 				if string(evento.Audio) != exp.audio {
 					t.Fatalf("evento %d: esperava áudio %q, veio %q", i, exp.audio, evento.Audio)
@@ -105,8 +109,18 @@ func TestTransmissaoECortadaAutomaticamenteApos90Segundos(t *testing.T) {
 
 	select {
 	case evento := <-ouvinte.Eventos:
-		if evento.Tipo != "inicio_reproducao" {
-			t.Fatalf("esperava inicio_reproducao, veio %q", evento.Tipo)
+		for evento.Tipo == "estado_canal" {
+			evento = <-ouvinte.Eventos
+		}
+		for evento.Tipo != "fim_reproducao" {
+			select {
+			case evento = <-ouvinte.Eventos:
+			case <-time.After(time.Second):
+				t.Fatal("transmissão não encerrou após o limite")
+			}
+		}
+		if err := c.ReceberChunk(t1.ID, []byte("tardio")); err != ErrTransmissaoInexistente {
+			t.Fatalf("chunk após limite deveria ser recusado: %v", err)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("transmissão não foi cortada e reproduzida automaticamente após o limite de tempo")

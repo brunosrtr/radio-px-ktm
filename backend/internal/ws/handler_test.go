@@ -80,6 +80,12 @@ func TestProtocoloWebSocketTransmissaoDeVoz(t *testing.T) {
 		t.Fatal("slot_concedido não trouxe transmissao_id")
 	}
 
+	enviarTexto(t, connA, "solicitar_slot", map[string]any{"canal_id": canalID})
+	negado := lerMensagem(t, connA)
+	if negado.Tipo != "slot_negado" || negado.Dados["motivo"] != "transmissao_em_andamento" {
+		t.Fatalf("segunda captura deveria ser negada: %+v", negado)
+	}
+
 	if err := connA.Write(context.Background(), websocket.MessageBinary, []byte("chunk-opus-1")); err != nil {
 		t.Fatalf("erro ao enviar frame binário: %v", err)
 	}
@@ -101,6 +107,21 @@ func TestProtocoloWebSocketTransmissaoDeVoz(t *testing.T) {
 	fim := lerMensagem(t, connB)
 	if fim.Tipo != "fim_reproducao" {
 		t.Fatalf("esperava fim_reproducao em B, veio %q", fim.Tipo)
+	}
+	encerrada := lerMensagem(t, connA)
+	if encerrada.Tipo != "transmissao_encerrada" || encerrada.Dados["motivo"] != "concluida" {
+		t.Fatalf("remetente não recebeu encerramento: %+v", encerrada)
+	}
+	enviarTexto(t, connA, "solicitar_slot", map[string]any{"canal_id": canalID})
+	cancelavel := lerMensagem(t, connA)
+	if cancelavel.Tipo != "slot_concedido" {
+		t.Fatalf("slot não concedido: %+v", cancelavel)
+	}
+	enviarTexto(t, connA, "cancelar_transmissao", map[string]any{"transmissao_id": cancelavel.Dados["transmissao_id"]})
+	enviarTexto(t, connA, "solicitar_slot", map[string]any{"canal_id": canalID})
+	novo := lerMensagem(t, connA)
+	if novo.Tipo != "slot_concedido" {
+		t.Fatalf("captura cancelada bloqueou nova fala: %+v", novo)
 	}
 }
 
@@ -153,6 +174,9 @@ func lerMensagem(t *testing.T, conn *websocket.Conn) mensagem {
 	var m mensagem
 	if err := json.Unmarshal(dados, &m); err != nil {
 		t.Fatalf("erro ao decodificar mensagem: %v (corpo: %s)", err, dados)
+	}
+	if m.Tipo == "estado_canal" {
+		return lerMensagem(t, conn)
 	}
 	return m
 }
