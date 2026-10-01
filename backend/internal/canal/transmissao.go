@@ -22,6 +22,7 @@ type Transmissao struct {
 	cond         *sync.Cond
 	chunks       [][]byte
 	finalizada   bool
+	cancelada    bool
 	finalizadaCh chan struct{}
 }
 
@@ -37,15 +38,16 @@ func novaTransmissao(id, remetenteID, remetenteNome string) *Transmissao {
 	return t
 }
 
-func (t *Transmissao) receberChunk(chunk []byte) {
+func (t *Transmissao) receberChunk(chunk []byte) bool {
 	t.mu.Lock()
 	if t.finalizada {
 		t.mu.Unlock()
-		return
+		return false
 	}
 	t.chunks = append(t.chunks, chunk)
 	t.mu.Unlock()
 	t.cond.Broadcast()
+	return true
 }
 
 // finalizar marca a transmissão como encerrada: não chegam mais chunks
@@ -92,4 +94,24 @@ func (t *Transmissao) zerarBuffer() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.chunks = nil
+}
+
+// cancelar descarta uma captura incompleta e acorda o consumidor sem
+// reproduzir os chunks restantes. Não altera buffers já entregues à rede.
+func (t *Transmissao) cancelar() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.cancelada = true
+	t.chunks = nil
+	if !t.finalizada {
+		t.finalizada = true
+		close(t.finalizadaCh)
+	}
+	t.cond.Broadcast()
+}
+
+func (t *Transmissao) foiCancelada() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.cancelada
 }

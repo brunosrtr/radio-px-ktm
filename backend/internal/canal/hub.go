@@ -25,7 +25,9 @@ const DuracaoMaximaTransmissao = 90 * time.Second
 var (
 	// ErrFilaCheia indica que a fila do canal já tem 10 transmissões
 	// pendentes de reprodução.
-	ErrFilaCheia = errors.New("canal: fila cheia")
+	ErrFilaCheia              = errors.New("canal: fila cheia")
+	ErrCanalFechado           = errors.New("canal: fechado")
+	ErrTransmissaoEmAndamento = errors.New("canal: transmissão em andamento")
 	// ErrTransmissaoInexistente indica que a transmissão já foi finalizada,
 	// cortada por limite de tempo, ou nunca existiu nesta conexão.
 	ErrTransmissaoInexistente = errors.New("canal: transmissão inexistente ou já encerrada")
@@ -116,6 +118,7 @@ func (c *Canal) Entrar(usuarioID, nome string) (membro *Membro, participantes in
 
 	m := novoMembro(usuarioID, nome)
 	c.membros[usuarioID] = m
+	c.publicarEstadoLocked()
 	return m, len(c.membros), nil
 }
 
@@ -137,6 +140,8 @@ func (c *Canal) Sair(usuarioID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.membros, usuarioID)
+	c.cancelarCapturasLocked(usuarioID)
+	c.publicarEstadoLocked()
 }
 
 // TemMembro indica se o usuário está atualmente conectado ao canal.
@@ -156,6 +161,8 @@ func (c *Canal) Remover(usuarioID string, evento Evento) {
 	m, ok := c.membros[usuarioID]
 	if ok {
 		delete(c.membros, usuarioID)
+		c.cancelarCapturasLocked(usuarioID)
+		c.publicarEstadoLocked()
 	}
 	c.mu.Unlock()
 	if ok {
@@ -184,6 +191,16 @@ func (c *Canal) TamanhoFila() int {
 // contar a partir desta chamada.
 func (c *Canal) SolicitarSlot(remetenteID, remetenteNome string) (*Transmissao, error) {
 	c.mu.Lock()
+	if c.fechado {
+		c.mu.Unlock()
+		return nil, ErrCanalFechado
+	}
+	for _, ativa := range c.transmissoesAtivas {
+		if ativa.RemetenteID == remetenteID {
+			c.mu.Unlock()
+			return nil, ErrTransmissaoEmAndamento
+		}
+	}
 	if len(c.filaTransmissoes) >= CapacidadeFila {
 		c.mu.Unlock()
 		return nil, ErrFilaCheia
@@ -193,6 +210,7 @@ func (c *Canal) SolicitarSlot(remetenteID, remetenteNome string) (*Transmissao, 
 	c.filaTransmissoes = append(c.filaTransmissoes, t)
 	c.transmissoesAtivas[t.ID] = t
 	duracaoMaxima := c.duracaoMaximaTransmissao
+	c.publicarEstadoLocked()
 	c.mu.Unlock()
 
 	c.cond.Signal()
@@ -205,35 +223,90 @@ func (c *Canal) SolicitarSlot(remetenteID, remetenteNome string) (*Transmissao, 
 // transmissão ativa correspondente.
 func (c *Canal) ReceberChunk(transmissaoID string, chunk []byte) error {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	t, ok := c.transmissoesAtivas[transmissaoID]
-	c.mu.Unlock()
-	if !ok {
+	if !ok || !t.receberChunk(chunk) {
 		return ErrTransmissaoInexistente
 	}
-	t.receberChunk(chunk)
 	return nil
 }
 
-// FinalizarTransmissao marca o fim da gravação, liberando a transmissão para
-// reprodução pela goroutine consumidora.
+// FinalizarTransmissao encerra a captura, preservando somente o áudio que
+// ainda aguarda sua primeira reprodução na fila.
 func (c *Canal) FinalizarTransmissao(transmissaoID string) error {
+	return c.finalizarTransmissao(transmissaoID, "concluida")
+}
+
+func (c *Canal) finalizarTransmissao(transmissaoID, motivo string) error {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	t, ok := c.transmissoesAtivas[transmissaoID]
-	if ok {
-		delete(c.transmissoesAtivas, transmissaoID)
-	}
-	c.mu.Unlock()
 	if !ok {
 		return ErrTransmissaoInexistente
 	}
+	delete(c.transmissoesAtivas, transmissaoID)
 	t.finalizar()
+	if m := c.membros[t.RemetenteID]; m != nil {
+		m.enviar(Evento{Tipo: "transmissao_encerrada", Dados: map[string]any{
+			"transmissao_id": t.ID, "motivo": motivo,
+		}})
+	}
 	return nil
 }
 
-// Fechar encerra a goroutine consumidora do canal.
+// CancelarTransmissao descarta a captura sem reproduzir o restante.
+func (c *Canal) CancelarTransmissao(transmissaoID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if t := c.transmissoesAtivas[transmissaoID]; t != nil {
+		c.descartarCapturaLocked(t)
+	}
+}
+
+// Chamado com mu adquirido. Transmissões já concluídas continuam na FIFO;
+// somente capturas incompletas são descartadas na saída/desconexão.
+func (c *Canal) cancelarCapturasLocked(usuarioID string) {
+	for _, t := range c.transmissoesAtivas {
+		if t.RemetenteID == usuarioID {
+			c.descartarCapturaLocked(t)
+		}
+	}
+}
+
+func (c *Canal) descartarCapturaLocked(t *Transmissao) {
+	delete(c.transmissoesAtivas, t.ID)
+	t.cancelar()
+	for i, pendente := range c.filaTransmissoes {
+		if pendente == t {
+			copy(c.filaTransmissoes[i:], c.filaTransmissoes[i+1:])
+			ultimo := len(c.filaTransmissoes) - 1
+			c.filaTransmissoes[ultimo] = nil
+			c.filaTransmissoes = c.filaTransmissoes[:ultimo]
+			break
+		}
+	}
+	c.publicarEstadoLocked()
+}
+
+// publicarEstadoLocked ordena as atualizações junto das mutações do hub.
+func (c *Canal) publicarEstadoLocked() {
+	evento := Evento{Tipo: "estado_canal", Dados: map[string]any{
+		"participantes": len(c.membros), "tamanho_fila": len(c.filaTransmissoes),
+	}}
+	for _, m := range c.membros {
+		m.enviar(evento)
+	}
+}
+
+// Fechar cancela capturas e libera a goroutine mesmo durante uma fala.
 func (c *Canal) Fechar() {
 	c.mu.Lock()
 	c.fechado = true
+	for _, t := range c.filaTransmissoes {
+		t.cancelar()
+	}
+	clear(c.transmissoesAtivas)
+	c.filaTransmissoes = nil
 	c.mu.Unlock()
 	c.cond.Broadcast()
 }
@@ -241,13 +314,9 @@ func (c *Canal) Fechar() {
 func (c *Canal) cortarAposLimite(t *Transmissao, duracaoMaxima time.Duration) {
 	timer := time.NewTimer(duracaoMaxima)
 	defer timer.Stop()
-
 	select {
 	case <-timer.C:
-		c.mu.Lock()
-		delete(c.transmissoesAtivas, t.ID)
-		c.mu.Unlock()
-		t.finalizar()
+		_ = c.finalizarTransmissao(t.ID, "limite")
 	case <-t.finalizadaCh:
 	}
 }
@@ -274,12 +343,21 @@ func (c *Canal) consumir() {
 		c.reproduzir(t)
 
 		c.mu.Lock()
-		c.filaTransmissoes = c.filaTransmissoes[1:]
+		if len(c.filaTransmissoes) > 0 && c.filaTransmissoes[0] == t {
+			c.filaTransmissoes[0] = nil
+			c.filaTransmissoes = c.filaTransmissoes[1:]
+		}
+		if !c.fechado {
+			c.publicarEstadoLocked()
+		}
 		c.mu.Unlock()
 	}
 }
 
 func (c *Canal) reproduzir(t *Transmissao) {
+	if t.foiCancelada() {
+		return
+	}
 	c.mu.Lock()
 	destinatarios := make([]*Membro, 0, len(c.membros))
 	for _, m := range c.membros {
@@ -305,16 +383,20 @@ func (c *Canal) reproduzir(t *Transmissao) {
 		}
 		lido = proximoLido
 		for _, m := range destinatarios {
-			m.enviar(Evento{Audio: chunk})
+			c.mu.Lock()
+			if c.membros[m.UsuarioID] == m && !m.Silenciado() && !t.foiCancelada() {
+				m.enviar(Evento{Audio: chunk})
+			}
+			c.mu.Unlock()
 		}
 	}
 
+	t.zerarBuffer()
 	fim := Evento{Tipo: "fim_reproducao", Dados: map[string]any{"transmissao_id": t.ID}}
 	for _, m := range destinatarios {
 		m.enviar(fim)
 	}
 
-	t.zerarBuffer()
 }
 
 func novoID() string {

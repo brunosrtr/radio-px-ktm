@@ -136,6 +136,14 @@ func (s *sessao) processarMensagem(ctx context.Context, dados []byte) {
 		_ = json.Unmarshal(msg.Dados, &corpo)
 		s.finalizarTransmissao(corpo.TransmissaoID)
 
+	case "cancelar_transmissao":
+		var corpo struct {
+			TransmissaoID string `json:"transmissao_id"`
+		}
+		if err := json.Unmarshal(msg.Dados, &corpo); err == nil {
+			s.cancelarTransmissao(corpo.TransmissaoID)
+		}
+
 	case "ping":
 		// Mantém a conexão viva; o contrato não exige resposta.
 
@@ -231,14 +239,21 @@ func (s *sessao) solicitarSlot(ctx context.Context) {
 	c := s.canalAtual
 	s.mu.Unlock()
 
-	if c == nil {
+	if c == nil || !c.TemMembro(s.usuarioID) {
 		s.enviarErro(ctx, "sem_permissao", "é preciso entrar em um canal antes de solicitar um slot")
 		return
 	}
 
 	t, err := c.SolicitarSlot(s.usuarioID, s.nome)
 	if err != nil {
-		s.enviarEvento(ctx, canal.Evento{Tipo: "slot_negado", Dados: map[string]any{"motivo": "fila_cheia"}})
+		motivo := "sem_permissao"
+		if errors.Is(err, canal.ErrFilaCheia) {
+			motivo = "fila_cheia"
+		}
+		if errors.Is(err, canal.ErrTransmissaoEmAndamento) {
+			motivo = "transmissao_em_andamento"
+		}
+		s.enviarEvento(ctx, canal.Evento{Tipo: "slot_negado", Dados: map[string]any{"motivo": motivo}})
 		return
 	}
 
@@ -281,10 +296,27 @@ func (s *sessao) finalizarTransmissao(transmissaoID string) {
 	}
 }
 
+func (s *sessao) cancelarTransmissao(transmissaoID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.canalAtual == nil || transmissaoID == "" || transmissaoID != s.transmissaoID {
+		return
+	}
+	s.canalAtual.CancelarTransmissao(transmissaoID)
+	s.transmissaoID = ""
+}
+
 func (s *sessao) encaminharEventos(ctx context.Context, membro *canal.Membro) {
 	for {
 		select {
 		case e := <-membro.Eventos:
+			if e.Tipo == "transmissao_encerrada" {
+				s.mu.Lock()
+				if s.transmissaoID == e.Dados["transmissao_id"] {
+					s.transmissaoID = ""
+				}
+				s.mu.Unlock()
+			}
 			if e.Audio != nil {
 				s.escrever(ctx, websocket.MessageBinary, e.Audio)
 				continue

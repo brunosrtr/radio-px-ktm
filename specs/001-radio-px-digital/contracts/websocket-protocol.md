@@ -20,6 +20,7 @@ uma conexão só tem uma transmissão ativa por vez).
 | `sair_canal` | `canal_id` | Saída manual; grava `motivo_saida = 'manual'` |
 | `solicitar_slot` | `canal_id` | Pede permissão para transmitir (checa `len(fila) < 10`) |
 | `finalizar_transmissao` | `transmissao_id` | Sinaliza fim da gravação |
+| `cancelar_transmissao` | `transmissao_id` | Descarta a captura ativa desta conexão e libera a vaga; usado quando o botão é solto antes da autorização ou a captura falha |
 | `ping` | — | Mantém a conexão viva |
 
 Após receber `slot_concedido`, o cliente envia frames binários de áudio
@@ -33,8 +34,9 @@ conexão, até enviar `finalizar_transmissao` ou atingir os 90 segundos
 |---|---|---|
 | `canal_entrado` | `canal_id`, `participantes`, `tamanho_fila` | Entrada aceita |
 | `slot_concedido` | `transmissao_id`, `duracao_maxima_ms` | Havia espaço na fila (`duracao_maxima_ms` = 90000) |
-| `slot_negado` | `motivo` | `fila_cheia`, `sem_permissao`, `fora_da_area` |
+| `slot_negado` | `motivo` | `fila_cheia`, `sem_permissao`, `fora_da_area`, `transmissao_em_andamento` |
 | `inicio_reproducao` | `transmissao_id`, `remetente_nome` | Antes dos frames de áudio (FR-021) |
+| `transmissao_encerrada` | `transmissao_id`, `motivo` | Aviso ao remetente: captura encerrada por `limite` ou `concluida`; o app deve parar o microfone |
 | `fim_reproducao` | `transmissao_id` | Buffer descartado no servidor (FR-008) |
 | `removido_canal` | `canal_id`, `motivo` | `geocerca`, `limite`, `canal_desativado` (FR-017) |
 | `estado_canal` | `participantes`, `tamanho_fila` | Mudança relevante no canal (entrada/saída, fila muda de tamanho) |
@@ -80,3 +82,18 @@ Cliente A                      Servidor                       Cliente B
 6. Ao concluir a reprodução de uma transmissão para todos os membros não
    silenciados, zerar o buffer de chunks em memória antes de processar o
    próximo item da fila (FR-008/FR-009).
+
+## Estabilização do PTT (2026-09-29)
+
+- A conexão só pode ter uma captura ativa; uma nova solicitação durante a
+  captura recebe `slot_negado: transmissao_em_andamento`.
+- O app só abre o microfone se o botão continuar pressionado ao receber
+  `slot_concedido`; caso contrário, envia `cancelar_transmissao`.
+- `duracao_maxima_ms` também agenda uma parada local. O corte do servidor
+  continua obrigatório e é comunicado por `transmissao_encerrada`.
+- Saída manual, remoção e desconexão descartam a captura incompleta e
+  liberam sua posição na fila. Áudio já entregue à rede não pode ser desfeito.
+- `estado_canal` é publicado nas mudanças de participantes e de fila.
+- Esta etapa preserva a contagem do contrato existente (10 transmissões
+  incluindo a atual). A divergência com FR-006 (10 aguardando) e a escolha
+  entre fila de mensagens e fila de vez continuam pendentes de alinhamento.

@@ -74,13 +74,22 @@ class AudioService {
     final controlador = StreamController<Uint8List>();
     _chunksGravados = controlador;
 
-    await _recorder.startRecorder(
-      codec: _codec,
-      toStream: controlador.sink,
-      sampleRate: _sampleRate,
-      numChannels: 1,
-      bitRate: _bitRateBps,
-    );
+    try {
+      await _recorder.startRecorder(
+        codec: _codec,
+        toStream: controlador.sink,
+        sampleRate: _sampleRate,
+        numChannels: 1,
+        bitRate: _bitRateBps,
+      );
+    } catch (_) {
+      // Uma falha antes de devolver o stream não pode deixar close()
+      // aguardando indefinidamente um ouvinte que nunca será registrado.
+      await controlador.stream.listen((_) {}).cancel();
+      await controlador.close();
+      _chunksGravados = null;
+      rethrow;
+    }
 
     return controlador.stream;
   }

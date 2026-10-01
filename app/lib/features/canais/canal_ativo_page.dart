@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -8,6 +7,7 @@ import '../../services/audio_service.dart';
 import '../../services/background_service.dart';
 import '../../services/canal_service.dart';
 import '../../services/localizacao_service.dart';
+import '../../services/ptt_controller.dart';
 
 /// Tela do canal ativo: botão push-to-talk, bloqueio quando a fila está
 /// cheia e exibição do nome de quem está falando (FR-04 a FR-09, FR-21).
@@ -31,16 +31,18 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   final _localizacaoService = LocalizacaoService();
 
   StreamSubscription<EventoCanal>? _assinaturaEventos;
-  StreamSubscription<Uint8List>? _assinaturaGravacao;
+  late final ControladorPtt _ptt;
+  Future<void>? _inicializacao;
+  bool _encerrando = false;
+  bool _conexaoEncerrada = false;
 
   bool _conectado = false;
   bool _audioDestravado = false;
   bool _filaCheia = false;
-  bool _gravando = false;
-  bool _aguardandoSlot = false;
+  bool get _gravando => _ptt.gravando;
+  bool get _aguardandoSlot => _ptt.aguardando;
   int _tamanhoFila = 0;
   int _participantes = 0;
-  String? _transmissaoAtivaId;
   String? _remetenteFalando;
   String? _avisoRemocao;
 
@@ -49,6 +51,20 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   @override
   void initState() {
     super.initState();
+    _ptt = ControladorPtt(
+      solicitarSlot: () => _canalService.solicitarSlot(widget.canalId),
+      finalizarTransmissao: _canalService.finalizarTransmissao,
+      cancelarTransmissao: _canalService.cancelarTransmissao,
+      iniciarGravacao: _audioService.iniciarGravacao,
+      pararGravacao: _audioService.pararGravacao,
+      enviarAudio: _canalService.enviarChunkAudio,
+      aoMudar: () { if (mounted && !_encerrando) setState(() {}); },
+      aoFalhar: (_) {
+        if (mounted && !_encerrando) {
+          setState(() => _avisoRemocao = 'Não foi possível transmitir. Verifique a permissão do microfone.');
+        }
+      },
+    );
     // Sem isso, uma falha silenciosa na conexão (que não gera nenhum evento
     // de erro do servidor — ex.: o handshake do WebSocket nem chega a abrir)
     // deixaria a tela girando no "Entrando no canal…" para sempre, sem
@@ -59,35 +75,47 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         _avisoRemocao ??= 'Não foi possível conectar ao canal. Verifique sua conexão e tente novamente.';
       });
     });
-    _iniciar();
+    _inicializacao = _iniciar();
   }
 
   Future<void> _iniciar() async {
     try {
-      // Conectar e entrar no canal vem primeiro, e não pode esperar nada que
-      // dependa do usuário responder um prompt do navegador (microfone,
-      // localização) — senão a entrada no canal fica pendurada atrás de uma
-      // permissão que ele pode demorar a conceder, enquanto a tela já mostra
-      // tudo pronto para falar.
+      // O player precisa estar pronto antes de receber o primeiro chunk.
+      await _audioService.abrirParaOuvir();
+      if (_encerrando) return;
+      await _audioService.iniciarReproducao();
+      if (_encerrando) return;
       await _canalService.conectar();
-      _assinaturaEventos = _canalService.eventos.listen(_processarEvento);
-      _canalService.entrarCanal(widget.canalId);
-    } catch (_) {
-      if (!mounted) return;
-      setState(
-        () => _avisoRemocao = 'Não foi possível conectar ao canal. Verifique sua conexão e tente novamente.',
+      if (_encerrando) return;
+      _assinaturaEventos = _canalService.eventos.listen(
+        _processarEvento,
+        onDone: _perderConexao,
+        onError: (Object _) => _perderConexao(),
       );
-      return;
+      _canalService.entrarCanal(widget.canalId);
+      await BackgroundService.iniciar();
+      if (_encerrando) return;
+      await _localizacaoService.iniciar();
+    } catch (_) {
+      _perderConexao();
     }
+  }
 
-    await _audioService.abrirParaOuvir();
-    await _audioService.iniciarReproducao();
-
-    await BackgroundService.iniciar();
-    await _localizacaoService.iniciar();
+  void _perderConexao() {
+    if (!mounted || _encerrando || _conexaoEncerrada) return;
+    _conexaoEncerrada = true;
+    _timeoutConexao?.cancel();
+    unawaited(_ptt.interromper());
+    unawaited(_audioService.pararReproducao());
+    setState(() {
+      _conectado = false;
+      _remetenteFalando = null;
+      _avisoRemocao = 'Conexão com o canal encerrada. Volte e entre novamente.';
+    });
   }
 
   void _processarEvento(EventoCanal evento) {
+    if (!mounted || _encerrando || _conexaoEncerrada) return;
     if (evento.isAudio) {
       _audioService.reproduzirChunk(evento.audio!);
       return;
@@ -110,20 +138,19 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         break;
 
       case 'slot_concedido':
-        final transmissaoId = evento.dados?['transmissao_id'] as String;
-        setState(() {
-          _transmissaoAtivaId = transmissaoId;
-          _gravando = true;
-          _aguardandoSlot = false;
-        });
-        unawaited(_iniciarStreamDeGravacao());
+        unawaited(_ptt.conceder(
+          evento.dados!['transmissao_id'] as String,
+          Duration(milliseconds: evento.dados!['duracao_maxima_ms'] as int),
+        ));
         break;
 
       case 'slot_negado':
-        setState(() {
-          _aguardandoSlot = false;
-          _filaCheia = evento.dados?['motivo'] == 'fila_cheia';
-        });
+        _ptt.negar();
+        setState(() => _filaCheia = evento.dados?['motivo'] == 'fila_cheia');
+        break;
+
+      case 'transmissao_encerrada':
+        unawaited(_ptt.servidorEncerrou(evento.dados!['transmissao_id'] as String));
         break;
 
       case 'inicio_reproducao':
@@ -137,6 +164,10 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         break;
 
       case 'removido_canal':
+        _conexaoEncerrada = true;
+        unawaited(_ptt.interromper());
+        unawaited(_audioService.pararReproducao());
+        _conectado = false;
         setState(
           () => _avisoRemocao = _mensagemRemocao(evento.dados?['motivo'] as String?),
         );
@@ -147,8 +178,8 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       // estado de espera — sem isso o botão fica preso em "aguardando"
       // indefinidamente, sem nenhum feedback pro usuário.
       case 'erro':
+        _ptt.negar();
         setState(() {
-          _aguardandoSlot = false;
           _avisoRemocao = evento.dados?['mensagem'] as String? ??
               'Não foi possível completar a ação.';
         });
@@ -169,45 +200,31 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     }
   }
 
-  Future<void> _iniciarStreamDeGravacao() async {
-    final stream = await _audioService.iniciarGravacao();
-    _assinaturaGravacao = stream.listen(_canalService.enviarChunkAudio);
+  void _iniciarFala() {
+    if (!_conectado || _filaCheia || _encerrando) return;
+    _ptt.pressionar();
   }
 
-  Future<void> _iniciarFala() async {
-    if (!_conectado || _filaCheia || _gravando || _aguardandoSlot) return;
-    setState(() => _aguardandoSlot = true);
-    _canalService.solicitarSlot(widget.canalId);
-  }
-
-  Future<void> _pararFala() async {
-    if (!_gravando) return;
-
-    await _assinaturaGravacao?.cancel();
-    await _audioService.pararGravacao();
-
-    final transmissaoId = _transmissaoAtivaId;
-    setState(() {
-      _gravando = false;
-      _transmissaoAtivaId = null;
-    });
-
-    if (transmissaoId != null) {
-      _canalService.finalizarTransmissao(transmissaoId);
-    }
-  }
+  Future<void> _pararFala() => _ptt.soltar();
 
   @override
   void dispose() {
+    _encerrando = true;
     _timeoutConexao?.cancel();
-    _assinaturaEventos?.cancel();
-    _assinaturaGravacao?.cancel();
-    _canalService.sairCanal(widget.canalId);
-    unawaited(_canalService.desconectar());
-    unawaited(_audioService.fechar());
-    unawaited(_localizacaoService.parar());
-    unawaited(BackgroundService.parar());
+    unawaited(_ptt.fechar());
+    unawaited(_encerrarRecursos());
     super.dispose();
+  }
+
+  Future<void> _encerrarRecursos() async {
+    await _inicializacao;
+    await _ptt.fechar();
+    await _assinaturaEventos?.cancel();
+    _canalService.sairCanal(widget.canalId);
+    await _canalService.desconectar();
+    await _audioService.fechar();
+    await _localizacaoService.parar();
+    await BackgroundService.parar();
   }
 
   void _destravarAudioSeNecessario() {
@@ -258,7 +275,7 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       );
     }
 
-    final podeFalar = !_filaCheia && !_gravando && !_aguardandoSlot;
+    final podeFalar = _conectado && !_filaCheia && !_ptt.ocupado;
     final falando = _remetenteFalando != null;
 
     return Scaffold(
