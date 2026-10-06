@@ -1,17 +1,11 @@
-/// Configuração de ambiente do app, resolvida em tempo de build via
-/// `--dart-define` (sem arquivo `.env` embutido no bundle do app).
+// Endereços resolvidos na rede local ou sobrescritos por --dart-define.
+import 'rede_local.dart';
+
 class Env {
   Env._();
 
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
-  );
-
-  static const String wsBaseUrl = String.fromEnvironment(
-    'WS_BASE_URL',
-    defaultValue: 'ws://localhost:8080',
-  );
+  static String get apiBaseUrl => RedeLocal.instance.apiUrl;
+  static String get wsBaseUrl => RedeLocal.instance.wsUrl;
 
   /// Espelha a versão em pubspec.yaml — enviada no login para o registro de
   /// dispositivo (FR-017).

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/routes.dart';
 import '../../core/theme.dart';
 import 'auth_service.dart';
+import 'conexao_local.dart';
 
 /// Tela de login — contas são fornecidas pela empresa, sem autocadastro
 /// (research.md §5).
@@ -24,7 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   String? _erro;
 
   Future<void> _entrar() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_carregando || !_formKey.currentState!.validate()) return;
 
     setState(() {
       _carregando = true;
@@ -39,10 +40,14 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.canais);
     } on DioException catch (e) {
+      if (!mounted) return;
       final dados = e.response?.data;
       final mensagem = dados is Map ? dados['mensagem'] as String? : null;
       setState(
-        () => _erro = mensagem ?? 'Não foi possível entrar. Verifique login e senha.',
+        () => _erro =
+            mensagem ??
+            e.message ??
+            'Não foi possível entrar. Verifique login e senha.',
       );
     } finally {
       if (mounted) setState(() => _carregando = false);
@@ -123,12 +128,14 @@ class _LoginPageState extends State<LoginPage> {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 28),
+                        const ConexaoLocal(),
                         TextFormField(
                           controller: _loginController,
                           decoration: const InputDecoration(labelText: 'Login'),
                           textInputAction: TextInputAction.next,
-                          validator: (v) =>
-                              (v == null || v.isEmpty) ? 'Informe o login' : null,
+                          validator: (v) => (v == null || v.isEmpty)
+                              ? 'Informe o login'
+                              : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -136,8 +143,9 @@ class _LoginPageState extends State<LoginPage> {
                           decoration: const InputDecoration(labelText: 'Senha'),
                           obscureText: true,
                           onFieldSubmitted: (_) => _entrar(),
-                          validator: (v) =>
-                              (v == null || v.isEmpty) ? 'Informe a senha' : null,
+                          validator: (v) => (v == null || v.isEmpty)
+                              ? 'Informe a senha'
+                              : null,
                         ),
                         if (_erro != null) ...[
                           const SizedBox(height: 12),

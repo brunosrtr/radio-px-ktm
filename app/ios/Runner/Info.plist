@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Encontrar o computador da empresa e comunicar com ele pelo Wi-Fi.</string>
+    <key>NSBonjourServices</key>
+    <array><string>_radiopx._tcp</string></array>
+    <key>NSCameraUsageDescription</key>
+    <string>Ler o QR Code de conexão exibido no computador da empresa.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict><key>NSAllowsLocalNetworking</key><true/></dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

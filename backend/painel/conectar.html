@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conectar celulares — Rádio PX KTM</title>
+<style>
+body{font:16px system-ui,sans-serif;background:#eef3f8;color:#17324d;margin:0;padding:32px}
+main{max-width:720px;margin:auto;background:white;border-radius:20px;padding:28px}
+h1{font-size:26px}button,a{color:#12628c}button{padding:12px;cursor:pointer}
+#enderecos{display:flex;flex-wrap:wrap;gap:20px}figure{margin:16px 0;max-width:320px}
+img{width:100%;max-width:320px}figcaption{overflow-wrap:anywhere}#estado{min-height:24px}
+</style>
+<main>
+<a href="/painel/">Voltar ao painel</a>
+<h1>Conectar celulares</h1>
+<p>Conecte o computador e os celulares ao mesmo Wi-Fi. O aplicativo procura o computador automaticamente.</p>
+<p>Se ele não encontrar, toque em <strong>Ler QR Code</strong> na tela de login e aponte a câmera para um dos códigos abaixo.</p>
+<p id="identidade"></p>
+<button id="atualizar" type="button">Atualizar conexão</button>
+<p id="estado" role="status">Consultando rede…</p>
+<div id="enderecos"></div>
+<p>O QR Code configura a conexão. Cada motorista continua entrando com sua própria conta.</p>
+</main>
+<script>
+let assinatura = '';
+let consultando = false;
+async function atualizar() {
+ if (consultando) return;
+ consultando = true;
+ const estado = document.getElementById('estado');
+ try {
+  const resposta = await fetch('/local/info', {cache:'no-store'});
+  if (!resposta.ok) throw new Error();
+  const dados = await resposta.json();
+  document.getElementById('identidade').textContent = dados.name + ' · ' + dados.id.slice(0,8);
+  const nova = JSON.stringify([dados.id,dados.addresses]);
+  if (assinatura !== nova) {
+   assinatura = nova;
+   const destino = document.getElementById('enderecos');
+   destino.replaceChildren();
+   for (const endereco of dados.addresses) {
+    const figura = document.createElement('figure');
+    const img = document.createElement('img');
+    img.src = '/local/qr?endereco=' + encodeURIComponent(endereco);
+    img.alt = 'QR Code de conexão com o computador';
+    const legenda = document.createElement('figcaption');
+    legenda.textContent = endereco;
+    figura.append(img, legenda);
+    destino.append(figura);
+   }
+  }
+  estado.textContent = dados.addresses.length ? 'Conexão atualizada. Se houver mais de um código, use o da rede Wi-Fi dos celulares.' :
+   'Nenhuma rede local encontrada. Conecte o computador ao Wi-Fi e tente novamente.';
+ } catch {
+  assinatura = '';
+  document.getElementById('enderecos').replaceChildren();
+  estado.textContent = 'Conexão local indisponível. Inicie o backend com a descoberta local habilitada.';
+ } finally { consultando = false; }
+}
+document.getElementById('atualizar').addEventListener('click', atualizar);
+atualizar();
+setInterval(atualizar, 10000);
+</script>
+</html>

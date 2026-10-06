@@ -5,7 +5,9 @@ import 'dart:typed_data';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../core/env.dart';
+import '../core/rede_local.dart';
 import '../core/token_storage.dart';
+import 'ws_conexao.dart';
 
 /// Um evento recebido do canal: de controle (JSON) ou um chunk de áudio
 /// (frame binário) — nunca os dois ao mesmo tempo, espelhando `canal.Evento`
@@ -13,10 +15,7 @@ import '../core/token_storage.dart';
 class EventoCanal {
   EventoCanal.controle(this.tipo, this.dados) : audio = null;
 
-  EventoCanal.audio(Uint8List bytes)
-    : tipo = null,
-      dados = null,
-      audio = bytes;
+  EventoCanal.audio(Uint8List bytes) : tipo = null, dados = null, audio = bytes;
 
   final String? tipo;
   final Map<String, dynamic>? dados;
@@ -39,18 +38,27 @@ class CanalService {
   Stream<EventoCanal> get eventos => _eventos!.stream;
 
   Future<void> conectar() async {
+    await RedeLocal.instance.assegurarConexao();
     final token = _tokenStorage.token;
-    final uri = Uri.parse(
-      '${Env.wsBaseUrl}/ws',
-    ).replace(queryParameters: {'token': ?token});
+    final uri = Uri.parse('${Env.wsBaseUrl}/ws')
+        .replace(queryParameters: {'token': ?token});
 
     _eventos = StreamController<EventoCanal>.broadcast();
-    _canal = WebSocketChannel.connect(uri);
+    _canal = conectarWebSocket(uri);
 
+    final eventos = _eventos!;
     _canal!.stream.listen(
-      _processarMensagemRecebida,
-      onDone: () => _eventos?.close(),
-      onError: (Object erro) => _eventos?.addError(erro),
+      (mensagem) {
+        if (identical(_eventos, eventos) && !eventos.isClosed) {
+          _processarMensagemRecebida(mensagem);
+        }
+      },
+      onDone: () {
+        if (!eventos.isClosed) unawaited(eventos.close());
+      },
+      onError: (Object erro) {
+        if (!eventos.isClosed) eventos.addError(erro);
+      },
     );
 
     // Sem isso, um `entrarCanal` chamado logo em seguida pode ser enviado
@@ -104,7 +112,11 @@ class CanalService {
   }
 
   Future<void> desconectar() async {
-    await _canal?.sink.close();
+    try {
+      await _canal?.sink.close().timeout(const Duration(seconds: 2));
+    } catch (_) {
+      /* A conexão perdida não deve bloquear a reconexão. */
+    }
     if (_eventos != null && !_eventos!.isClosed) await _eventos!.close();
     _canal = null;
     _eventos = null;
