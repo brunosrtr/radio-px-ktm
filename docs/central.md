@@ -49,3 +49,21 @@ das posições, normalmente enviadas em lotes de 90 segundos.
 
 O modo local depende da rede entre celulares e computador. QR code e raio
 geográfico não dão acesso ao backend quando essa comunicação está bloqueada.
+
+## Contas de caminhoneiros e veículos
+
+No painel, clique em **Contas e veículos**. O acesso é exclusivo de
+administradores e os cadastros pertencem à empresa da conta autenticada.
+Informe nome, sobrenome, CPF válido, senha (mínimo de oito caracteres),
+confirmação da senha e veículo utilizado. A senha é armazenada somente como
+hash bcrypt e sua confirmação não é gravada.
+
+O CPF, com ou sem pontuação, será o login da nova conta no aplicativo. Os
+logins existentes continuam funcionando. Nome e sobrenome compõem o nome
+completo exibido nas falas e no mapa.
+
+Escolha um veículo já cadastrado ou marque **Cadastrar um novo veículo nesta
+conta** e informe nome/modelo e placa. O cadastro conjunto é transacional:
+se a conta não puder ser criada, o novo veículo também não é cadastrado.
+Também é possível cadastrar um veículo separadamente na mesma página.
+A lista mostra os caminhoneiros cadastrados, CPF, login e veículo.
