@@ -38,6 +38,46 @@ class LocalizacaoService {
   Position? _ultimaCapturada;
   DateTime? _ultimaCapturadaEm;
 
+  /// Atualiza a posição antes da consulta/entrada em canais com geocerca.
+  /// Evita exigir uma participação em canal para obter o primeiro GPS.
+  Future<void> atualizarPosicaoParaEntrada() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw const FormatException(
+        'Ative o GPS para acessar canais com área limitada.',
+      );
+    }
+    var permissao = await Geolocator.checkPermission();
+    if (permissao == LocationPermission.denied) {
+      permissao = await Geolocator.requestPermission();
+    }
+    if (permissao == LocationPermission.denied ||
+        permissao == LocationPermission.deniedForever) {
+      throw const FormatException(
+        'Permita localização para acessar canais com área limitada.',
+      );
+    }
+    final ponto = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 10),
+      ),
+    );
+    await _apiClient.dio.post(
+      '/posicoes',
+      data: {
+        'pontos': [
+          PontoLocal(
+            latitude: ponto.latitude,
+            longitude: ponto.longitude,
+            precisaoMetros: ponto.accuracy,
+            velocidadeKmh: ponto.speed < 0 ? null : ponto.speed * 3.6,
+            capturadoEm: DateTime.now().toUtc(),
+          ).paraJson(),
+        ],
+      },
+    );
+  }
+
   Future<void> iniciar() async {
     await _fila.abrir();
 
@@ -51,9 +91,7 @@ class LocalizacaoService {
     }
 
     _assinaturaPosicoes = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     ).listen(_processarNovaPosicao);
 
     _timerEnvio = Timer.periodic(intervaloEnvio, (_) => enviarLotePendente());
