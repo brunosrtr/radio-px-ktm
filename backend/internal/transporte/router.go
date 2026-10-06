@@ -31,6 +31,13 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	r.Use(middleware.Recoverer)
 	r.Use(corsMiddleware)
 
+	// O endereço principal abre o painel; as rotas da API continuam explícitas.
+	abrirPainel := func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/painel/", http.StatusFound)
+	}
+	r.Get("/", abrirPainel)
+	r.Get("/painel", abrirPainel)
+
 	r.Get("/health", handlerHealth(pool))
 
 	gerenciadorCanais := canal.NovoGerenciador()
