@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 /// Mantém o processo do app vivo em segundo plano no Android via um
@@ -45,12 +47,25 @@ class BackgroundService {
     if (kIsWeb) return;
     _inicializar();
     if (await FlutterForegroundTask.isRunningService) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final permissions = await [
+        Permission.microphone,
+        Permission.locationWhenInUse,
+      ].request();
+      if (permissions.values.any((status) => !status.isGranted)) {
+        throw StateError(
+          'Permita microfone e localização para entrar no canal.',
+        );
+      }
+      await FlutterForegroundTask.requestNotificationPermission();
+    }
 
-    await FlutterForegroundTask.startService(
+    final result = await FlutterForegroundTask.startService(
       notificationTitle: 'Rádio PX Digital',
       notificationText: 'Canal de voz e localização ativos',
       callback: iniciarTarefaDeSegundoPlano,
     );
+    if (result is ServiceRequestFailure) throw result.error;
   }
 
   static Future<void> parar() {
