@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/geofence"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
@@ -70,6 +71,12 @@ func validarDTO(dto DTOCanal) error {
 	if dto.GeocercaAtiva && (dto.CentroLatitude == nil || dto.CentroLongitude == nil || dto.RaioMetros == nil) {
 		return fmt.Errorf("%w: geocerca ativa exige centro_latitude, centro_longitude e raio_metros", ErrCanalInvalido)
 	}
+	if dto.GeocercaAtiva {
+		lat, lon := *dto.CentroLatitude, *dto.CentroLongitude
+		if math.IsNaN(lat) || math.IsInf(lat, 0) || lat < -90 || lat > 90 || math.IsNaN(lon) || math.IsInf(lon, 0) || lon < -180 || lon > 180 || *dto.RaioMetros < 1 || *dto.RaioMetros > 20000000 {
+			return fmt.Errorf("%w: centro geográfico ou raio inválido", ErrCanalInvalido)
+		}
+	}
 	return nil
 }
 
@@ -124,6 +131,18 @@ func (s *Servico) Editar(ctx context.Context, canalID, empresaID string, dto DTO
 
 	if hub, ok := s.gerenciador.Obter(canalID); ok {
 		hub.DefinirLimiteParticipantes(atualizado.LimiteParticipantes)
+		// Uma redução do raio vale também para motoristas já conectados.
+		if atualizado.GeocercaAtiva {
+			for _, membro := range hub.EstadoParaCentral().Participantes {
+				ponto, err := s.posicoes.ObterAtual(ctx, membro.UsuarioID)
+				if err != nil || !geofence.DentroDoRaio(ponto.Latitude, ponto.Longitude, *atualizado.CentroLatitude, *atualizado.CentroLongitude, *atualizado.RaioMetros) {
+					hub.Remover(membro.UsuarioID, Evento{Tipo: "removido_canal", Dados: map[string]any{"canal_id": canalID, "motivo": "geocerca"}})
+					if err := s.repositorio.RegistrarSaida(ctx, canalID, membro.UsuarioID, "geocerca"); err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
 	}
 
 	return atualizado, nil

@@ -37,11 +37,16 @@ dependencies:
   flutter_riverpod: ^3.4.3
   dio: ^5.11.1
   web_socket_channel: ^3.0.3
+  permission_handler: ^12.0.1
   geolocator: ^14.0.3
   flutter_foreground_task: ^11.0.3
   flutter_sound: ^9.30.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  opus_dart: ^3.0.1
+  opus_flutter_new: ^3.0.7
+  nsd: ^5.0.1
+  mobile_scanner: ^7.4.2
 
 dev_dependencies:
   flutter_test:
@@ -53,6 +58,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

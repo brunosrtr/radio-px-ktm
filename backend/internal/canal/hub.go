@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"sort"
 	"sync"
 	"time"
 )
@@ -55,6 +56,8 @@ type Canal struct {
 	mu                  sync.Mutex
 	limiteParticipantes int
 	membros             map[string]*Membro
+	ouvintes            map[string]*Membro
+	emReproducao        string
 	transmissoesAtivas  map[string]*Transmissao
 	filaTransmissoes    []*Transmissao
 	fechado             bool
@@ -82,6 +85,7 @@ func NovoCanal(id string, opcoes ...Opcao) *Canal {
 		ID:                       id,
 		duracaoMaximaTransmissao: DuracaoMaximaTransmissao,
 		membros:                  make(map[string]*Membro),
+		ouvintes:                 make(map[string]*Membro),
 		transmissoesAtivas:       make(map[string]*Transmissao),
 	}
 	c.cond = sync.NewCond(&c.mu)
@@ -306,6 +310,9 @@ func (c *Canal) Fechar() {
 		t.cancelar()
 	}
 	clear(c.transmissoesAtivas)
+	for _, ouvinte := range c.ouvintes {
+		ouvinte.falhaUmaVez.Do(func() { close(ouvinte.Falha) })
+	}
 	c.filaTransmissoes = nil
 	c.mu.Unlock()
 	c.cond.Broadcast()
@@ -338,11 +345,13 @@ func (c *Canal) consumir() {
 			return
 		}
 		t := c.filaTransmissoes[0]
+		c.emReproducao = t.ID
 		c.mu.Unlock()
 
 		c.reproduzir(t)
 
 		c.mu.Lock()
+		c.emReproducao = ""
 		if len(c.filaTransmissoes) > 0 && c.filaTransmissoes[0] == t {
 			c.filaTransmissoes[0] = nil
 			c.filaTransmissoes = c.filaTransmissoes[1:]
@@ -366,6 +375,9 @@ func (c *Canal) reproduzir(t *Transmissao) {
 		}
 		destinatarios = append(destinatarios, m)
 	}
+	for _, m := range c.ouvintes {
+		destinatarios = append(destinatarios, m)
+	}
 	c.mu.Unlock()
 
 	inicio := Evento{Tipo: "inicio_reproducao", Dados: map[string]any{
@@ -373,7 +385,7 @@ func (c *Canal) reproduzir(t *Transmissao) {
 		"remetente_nome": t.RemetenteNome,
 	}}
 	for _, m := range destinatarios {
-		m.enviar(inicio)
+		c.enviarDestinatario(m, inicio)
 	}
 
 	for lido := 0; ; {
@@ -384,7 +396,7 @@ func (c *Canal) reproduzir(t *Transmissao) {
 		lido = proximoLido
 		for _, m := range destinatarios {
 			c.mu.Lock()
-			if c.membros[m.UsuarioID] == m && !m.Silenciado() && !t.foiCancelada() {
+			if (c.membros[m.UsuarioID] == m || c.ouvintes[m.UsuarioID] == m) && !m.Silenciado() && !t.foiCancelada() {
 				m.enviar(Evento{Audio: chunk})
 			}
 			c.mu.Unlock()
@@ -394,13 +406,82 @@ func (c *Canal) reproduzir(t *Transmissao) {
 	t.zerarBuffer()
 	fim := Evento{Tipo: "fim_reproducao", Dados: map[string]any{"transmissao_id": t.ID}}
 	for _, m := range destinatarios {
-		m.enviar(fim)
+		c.enviarDestinatario(m, fim)
 	}
 
+}
+
+func (c *Canal) enviarDestinatario(m *Membro, evento Evento) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.membros[m.UsuarioID] == m || c.ouvintes[m.UsuarioID] == m {
+		m.enviar(evento)
+	}
 }
 
 func novoID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// ParticipanteConectado informa presença real no hub, independente do GPS.
+type ParticipanteConectado struct {
+	UsuarioID string `json:"usuario_id"`
+	Nome      string `json:"nome"`
+}
+type MensagemNaFila struct {
+	ID            string `json:"id"`
+	RemetenteNome string `json:"remetente_nome"`
+	Estado        string `json:"estado"`
+}
+type EstadoCentral struct {
+	Participantes []ParticipanteConectado `json:"participantes"`
+	Fila          []MensagemNaFila        `json:"fila"`
+}
+
+func (c *Canal) EstadoParaCentral() EstadoCentral {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	estado := EstadoCentral{Participantes: []ParticipanteConectado{}, Fila: []MensagemNaFila{}}
+	for _, m := range c.membros {
+		estado.Participantes = append(estado.Participantes, ParticipanteConectado{m.UsuarioID, m.Nome})
+	}
+	sort.Slice(estado.Participantes, func(i, j int) bool { return estado.Participantes[i].Nome < estado.Participantes[j].Nome })
+	for _, t := range c.filaTransmissoes {
+		situacao := "aguardando"
+		if _, ok := c.transmissoesAtivas[t.ID]; ok {
+			situacao = "gravando"
+		}
+		if t.ID == c.emReproducao {
+			situacao = "em reprodução"
+		}
+		estado.Fila = append(estado.Fila, MensagemNaFila{t.ID, t.RemetenteNome, situacao})
+	}
+	return estado
+}
+
+// AssinarCentral escuta a FIFO sem ocupar uma vaga de motorista. Uma fala
+// já iniciada não é enviada parcialmente; a escuta começa na próxima fala.
+func (c *Canal) AssinarCentral() (*Membro, func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	id := novoID()
+	m := novoMembro(id, "Central")
+	m.Eventos = make(chan Evento, 8192)
+	m.Falha = make(chan struct{})
+	c.ouvintes[id] = m
+	return m, func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		delete(c.ouvintes, id)
+		// Libera os pacotes ainda não encaminhados quando a aba para de ouvir.
+		for {
+			select {
+			case <-m.Eventos:
+			default:
+				return
+			}
+		}
+	}
 }

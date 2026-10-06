@@ -11,9 +11,11 @@ const eventosBufferizados = 256
 // Membro representa um usuário conectado a um canal, do ponto de vista do
 // hub. O handler WebSocket lê Eventos e escreve cada um na conexão.
 type Membro struct {
-	UsuarioID string
-	Nome      string
-	Eventos   chan Evento
+	UsuarioID   string
+	Nome        string
+	Eventos     chan Evento
+	Falha       chan struct{}
+	falhaUmaVez sync.Once
 
 	mu         sync.Mutex
 	silenciado bool
@@ -49,5 +51,8 @@ func (m *Membro) enviar(e Evento) {
 	select {
 	case m.Eventos <- e:
 	default:
+		if m.Falha != nil {
+			m.falhaUmaVez.Do(func() { close(m.Falha) })
+		}
 	}
 }

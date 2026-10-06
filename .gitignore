@@ -3,3 +3,7 @@
 .env.*
 !.env.example
 .claude/settings.local.json
+
+# Identidade persistente da instalação local
+.radio-px-server-id
+backend/.radio-px-server-id

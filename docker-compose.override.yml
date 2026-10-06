@@ -1,0 +1,4 @@
+services:
+  backend:
+    environment:
+      PORT: "8080"

@@ -161,6 +161,22 @@
     border: 2px solid #fff;
   }
   .pin-motorista span { transform: rotate(45deg); color: #fff; font-weight: 700; font-size: 12px; }
+
+  #central-voz { padding:14px; border-bottom:1px solid var(--borda); overflow:auto; max-height:55vh; flex-shrink:0; font-size:13px; }
+  #central-voz h2 { font-size:15px; margin:0 0 10px; }
+  #central-voz select, #central-voz input { width:100%; padding:8px; border:1px solid var(--borda); border-radius:8px; margin:5px 0 10px; background:white; }
+  #central-voz button { border:0; border-radius:8px; padding:9px 12px; background:var(--azul-2); color:white; cursor:pointer; margin:4px 4px 4px 0; }
+  #central-voz button:disabled { opacity:.5; cursor:default; }
+  #central-voz .secundario { background:#eef2f5; color:var(--texto); }
+  #central-voz p { margin:8px 0; line-height:1.4; }
+  #central-voz ul, #central-voz ol { padding-left:20px; margin:8px 0; }
+  #central-voz li { margin:6px 0; }
+  #central-voz .aviso { color:var(--texto-fraco); font-size:12px; }
+  #central-voz .opcao-area { display:flex; gap:8px; align-items:center; margin:10px 0; }
+  #central-voz input[type=checkbox] { width:auto; margin:0; }
+  #form-canal { margin-top:10px; padding-top:10px; border-top:1px solid var(--borda); }
+  .canal-motorista { display:block; font-size:12px; margin-top:4px; color:var(--texto-fraco); }
+  #sidebar { min-height:0; overflow:auto; }
 </style>
 </head>
 <body>
@@ -170,6 +186,7 @@
       <div class="logo">📻</div>
       <h1>Rádio PX Digital</h1>
       <p class="subtitulo">Painel da empresa</p>
+      <p><a href="/painel/conectar.html">Conectar celulares</a></p>
       <input id="loginInput" placeholder="Login" autocomplete="username" />
       <input id="senhaInput" type="password" placeholder="Senha" autocomplete="current-password" />
       <button id="entrarBtn">Entrar</button>
@@ -185,9 +202,46 @@
         <div id="status-conexao"><span class="bolinha"></span><span id="textoStatus">conectando…</span></div>
         <div class="acoes-cabecalho">
           <button id="novaAbaBtn" class="botao-acao">📍&nbsp;Ver localização em nova aba</button>
+          <a href="/painel/conectar.html" class="botao-acao">Conectar celulares</a>
           <button id="sairBtn" class="botao-acao botao-acao-secundaria">Sair</button>
         </div>
       </div>
+      <section id="central-voz" aria-label="Canais e voz">
+        <h2>Canais e voz</h2>
+        <label for="canal-central">Canal</label>
+        <select id="canal-central"><option value="">Carregando canais…</option></select>
+        <p id="status-canais" role="status">Consultando participantes…</p>
+        <ul id="participantes-central"></ul>
+        <button id="ouvir-canal" disabled>Ouvir canal</button>
+        <button id="pausar-voz" class="secundario" disabled>Pausar</button>
+        <button id="parar-voz" class="secundario" disabled>Parar</button>
+        <p id="status-voz" role="status">Selecione um canal e clique em Ouvir canal.</p>
+        <p class="aviso">A escuta começa nas próximas mensagens. Elas tocam na ordem da fila após o fim de cada fala. O áudio é descartado após tocar ou ao parar a escuta.</p>
+        <strong>Fila de reprodução da central</strong>
+        <ol id="fila-central"><li>Nenhuma mensagem recebida.</li></ol>
+        <details><summary>Fila atual no canal</summary><ol id="fila-servidor"><li>Fila vazia.</li></ol></details>
+        <button id="novo-canal" class="secundario">Novo canal</button>
+        <button id="editar-canal" class="secundario" disabled>Editar canal</button>
+        <form id="form-canal" hidden>
+          <h2 id="titulo-form-canal">Novo canal</h2>
+          <label for="nome-canal">Nome</label><input id="nome-canal" required maxlength="100">
+          <label for="descricao-canal">Descrição</label><input id="descricao-canal" maxlength="300">
+          <label for="limite-canal">Limite de participantes</label>
+          <select id="limite-canal"><option>5</option><option selected>10</option><option>15</option><option>20</option></select>
+          <label class="opcao-area"><input id="limitar-area" type="checkbox"> Limitar acesso por distância</label>
+          <div id="campos-area" hidden>
+            <p class="aviso">Somente celulares dentro deste raio podem entrar. O GPS precisa estar ligado e autorizado.</p>
+            <label for="raio-canal">Raio em quilômetros</label><input id="raio-canal" type="number" min="0.001" max="20000" step="0.001" value="5">
+            <label for="latitude-canal">Latitude do centro</label><input id="latitude-canal" type="number" min="-90" max="90" step="any">
+            <label for="longitude-canal">Longitude do centro</label><input id="longitude-canal" type="number" min="-180" max="180" step="any">
+            <button type="button" id="escolher-centro" class="secundario">Escolher centro no mapa</button>
+            <p id="aviso-centro" class="aviso"></p>
+          </div>
+          <button type="submit" id="salvar-canal">Criar canal</button>
+          <button type="button" id="cancelar-canal" class="secundario">Cancelar</button>
+          <p id="status-form-canal" role="status"></p>
+        </form>
+      </section>
       <div id="busca-wrap">
         <input id="buscaInput" placeholder="Buscar motorista" />
       </div>
@@ -205,6 +259,7 @@
           <button class="fechar" id="fecharDetalhe">✕</button>
         </div>
         <div class="linha"><span>Velocidade</span><b id="velocidadeDetalhe">–</b></div>
+        <div class="linha"><span>Canal</span><b id="canalDetalhe">–</b></div>
         <div class="linha"><span>Última atualização</span><b id="tempoDetalhe">–</b></div>
         <button class="trajeto" id="trajetoBtn">Ver trajeto de hoje</button>
         <div class="aviso-trajeto" id="avisoTrajeto"></div>
@@ -212,6 +267,7 @@
     </div>
   </div>
 
+  <script src="/painel/central.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const API_BASE = window.location.origin;
@@ -288,12 +344,17 @@
       document.getElementById('painel').classList.add('visivel');
 
       iniciarMapa();
+      CentralVoz.iniciar(token, empresaId, mapa, () => {
+        renderizarLista();
+        if (motoristaSelecionadoId) atualizarPainelDetalhe(motoristaSelecionadoId);
+      });
       await carregarPosicoesIniciais();
       conectarWebSocket();
       setInterval(renderizarLista, 15000); // só para atualizar os "há Xs" relativos
     }
 
     function sair() {
+      CentralVoz.encerrar();
       localStorage.removeItem(CHAVE_TOKEN);
       location.reload();
     }
@@ -432,6 +493,7 @@
             <div class="info-motorista">
               <div class="linha1"><span class="nome">${escaparHtml(m.nome)}</span><span class="tempo">${tempoRelativo(m.capturado_em)}</span></div>
               <div class="detalhe"><span class="velocidade">${velocidade}</span></div>
+              <span class="canal-motorista">${escaparHtml(CentralVoz.canalDoUsuario(id))}</span>
             </div>
           </div>`;
       }).join('');
@@ -462,6 +524,7 @@
       avatar.style.background = m.cor;
       avatar.textContent = iniciais(m.nome);
       document.getElementById('nomeDetalhe').textContent = m.nome;
+      document.getElementById('canalDetalhe').textContent = CentralVoz.canalDoUsuario(id);
       document.getElementById('velocidadeDetalhe').textContent = (m.velocidade_kmh ?? null) !== null ? Math.round(m.velocidade_kmh) + ' km/h' : 'parado';
       document.getElementById('tempoDetalhe').textContent = tempoRelativo(m.capturado_em);
       document.getElementById('avisoTrajeto').textContent = '';

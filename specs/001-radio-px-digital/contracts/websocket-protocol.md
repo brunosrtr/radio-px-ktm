@@ -24,7 +24,8 @@ uma conexão só tem uma transmissão ativa por vez).
 | `ping` | — | Mantém a conexão viva |
 
 Após receber `slot_concedido`, o cliente envia frames binários de áudio
-(chunks Opus, conforme gerados pela gravação — ver research.md §7) na mesma
+(um pacote Opus completo por frame, mono a 16 kHz, duração de 20 ms,
+até 60 bytes de payload — 24 kbit/s; sem contêiner Ogg/WebM) na mesma
 conexão, até enviar `finalizar_transmissao` ou atingir os 90 segundos
 (cortado pelo servidor — ver research.md §3).
 
@@ -97,3 +98,17 @@ Cliente A                      Servidor                       Cliente B
 - Esta etapa preserva a contagem do contrato existente (10 transmissões
   incluindo a atual). A divergência com FR-006 (10 aguardando) e a escolha
   entre fila de mensagens e fila de vez continuam pendentes de alinhamento.
+
+## Áudio do app Android (correção de streaming)
+
+- Flutter Sound captura e reproduz PCM16 little-endian somente em memória.
+- O app codifica PCM para Opus antes do envio e decodifica Opus recebido antes
+  de alimentar o player; PCM nunca é enviado pelo WebSocket.
+- Cada transmissão cria um codificador e, no destinatário, um decodificador
+  novo em `inicio_reproducao`. `fim_reproducao` libera o decodificador sem
+  cortar PCM já entregue à fila local do player.
+- Ao soltar o botão, a sobra inferior a 20 ms é descartada; ao sair/desconectar,
+  a fila local é descartada. Nenhum arquivo de áudio é criado.
+- Clientes devem usar este formato de pacotes; clientes antigos que enviam
+  contêineres Ogg/WebM precisam ser atualizados. O backend continua repassando
+  bytes sem interpretar ou persistir áudio.

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/routes.dart';
+import 'core/rede_local.dart';
 import 'core/theme.dart';
 import 'features/auth/login_page.dart';
 import 'features/canais/lista_canais_page.dart';
@@ -10,6 +11,7 @@ import 'features/canais/lista_canais_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
+  await RedeLocal.instance.iniciar();
   runApp(const ProviderScope(child: RadioPxApp()));
 }
 

@@ -1,0 +1,15 @@
+# Linux: compartilha a rede do computador para receber/anunciar multicast.
+# Use explicitamente os dois arquivos; o override de desenvolvimento não é lido.
+services:
+  backend:
+    network_mode: host
+    ports: !reset []
+    environment:
+      PORT: "${BACKEND_PORT}"
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
+      LOCAL_DISCOVERY: "true"
+      LOCAL_ID_FILE: "/data/server-id"
+    volumes:
+      - local_identity:/data
+volumes:
+  local_identity:
