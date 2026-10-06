@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<title>Rádio PX Digital — Painel</title>
+<title>KTM Rádio PX — Central de operações</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
@@ -178,26 +178,46 @@
   .canal-motorista { display:block; font-size:12px; margin-top:4px; color:var(--texto-fraco); }
   #sidebar { min-height:0; overflow:auto; }
 </style>
+<link rel="stylesheet" href="/painel/marca.css?v=ktm1">
 </head>
 <body>
 
-  <div id="tela-login">
-    <div id="cartao-login">
-      <div class="logo">📻</div>
-      <h1>Rádio PX Digital</h1>
-      <p class="subtitulo">Painel da empresa</p>
-      <p><a href="/painel/conectar.html">Conectar celulares</a></p>
-      <input id="loginInput" placeholder="Login" autocomplete="username" />
-      <input id="senhaInput" type="password" placeholder="Senha" autocomplete="current-password" />
-      <button id="entrarBtn">Entrar</button>
-      <div id="erro-login"></div>
-    </div>
+  <div id="tela-login" class="login-shell">
+    <header class="site-header">
+      <a href="/painel/" aria-label="KTM — início"><img class="ktm-logo" src="/painel/assets/logo-ktm.png" alt="KTM Indústria"></a>
+      <nav class="site-nav" aria-label="Navegação principal"><a href="/painel/sobre.html">Sobre nós</a><a href="/painel/conectar.html" class="nav-cta">Conectar celulares ↗</a></nav>
+    </header>
+    <main class="login-grid">
+      <section class="login-editorial">
+        <div class="eyebrow">KTM · Central de operações</div>
+        <h1>Pessoas conectadas.<br><span>Operação no controle.</span></h1>
+        <p>Voz, localização e gestão da equipe em uma central. Acompanhe quem está na estrada e mantenha a comunicação da sua operação por perto.</p>
+        <div class="login-features"><span>Canais de voz</span><span>Localização da equipe</span><span>Gestão de contas</span></div>
+        <svg class="route-art" viewBox="0 0 520 180" fill="none" aria-hidden="true"><path d="M10 125H110L165 70H270L330 130H505M20 65H85L145 5H400L450 55H520M130 180L225 85V10M290 180L350 120V10" stroke="#293d49" stroke-width="1.5"/><path d="M12 125H110L165 70H270L330 130H475" stroke="#41c1f0" stroke-width="2.5" stroke-linejoin="round"/><circle cx="110" cy="125" r="7" fill="#080d12" stroke="#41c1f0" stroke-width="2"/><circle cx="270" cy="70" r="7" fill="#41c1f0"/><circle cx="475" cy="130" r="7" fill="#080d12" stroke="#41c1f0" stroke-width="2"/><path d="m263 67 7-15 7 15" stroke="#d8f3ff" stroke-width="2"/></svg>
+      </section>
+      <section id="cartao-login" aria-labelledby="titulo-login">
+        <div class="eyebrow">Acesso administrativo</div>
+        <h2 id="titulo-login">Bem-vindo à central.</h2>
+        <p class="subtitulo">Entre com sua conta para acompanhar<br>os canais e a equipe da sua empresa.</p>
+        <form id="formLogin">
+          <div class="login-field"><label for="loginInput">Login</label><input id="loginInput" placeholder="Seu login de administrador" autocomplete="username" required></div>
+          <div class="login-field"><label for="senhaInput">Senha</label><div class="password-field"><input id="senhaInput" type="password" placeholder="Sua senha" autocomplete="current-password" required><button class="show-password" id="mostrarSenhaLogin" type="button" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+          <button id="entrarBtn" class="login-submit" type="submit">Acessar central <span aria-hidden="true">↗</span></button>
+          <div id="erro-login" role="alert" aria-live="polite"></div>
+        </form>
+        <p class="login-help">Precisa de acesso? Solicite sua conta ao administrador da empresa.</p>
+        <div class="login-divider"></div>
+        <div class="login-pairing"><span>Vai conectar um caminhoneiro?</span><a href="/painel/conectar.html">Abrir QR code ↗</a></div>
+      </section>
+    </main>
+    <footer class="site-footer"><span>KTM Indústria · Rádio PX</span><nav><a href="/painel/sobre.html">Conheça a KTM</a><a href="https://ktm.ind.br/" target="_blank" rel="noopener noreferrer">Site institucional ↗</a></nav></footer>
   </div>
 
   <div id="painel">
     <div id="sidebar">
       <div id="cabecalho-sidebar">
-        <h1>Rádio PX Digital</h1>
+        <a href="/painel/" aria-label="KTM — central"><img class="ktm-logo" src="/painel/assets/logo-ktm.png" alt="KTM Indústria"></a>
+        <h1>Central de operações</h1>
         <div class="empresa" id="nomeEmpresa">Painel da empresa</div>
         <div id="status-conexao"><span class="bolinha"></span><span id="textoStatus">conectando…</span></div>
         <div class="acoes-cabecalho">
@@ -250,6 +270,7 @@
     </div>
 
     <div id="area-mapa">
+      <header class="workspace-toolbar"><div><small>KTM Rádio PX</small><h2>Visão da operação</h2></div><a href="/painel/sobre.html">Sobre a KTM ↗</a></header>
       <div id="barra-superior"><strong id="totalOnline">0</strong>&nbsp;motorista(s) com posição registrada</div>
       <div id="mapa"></div>
 
@@ -282,8 +303,8 @@
     // usuario_id -> { nome, latitude, longitude, velocidade_kmh, capturado_em, marcador }
     const motoristas = {};
 
-    document.getElementById('entrarBtn').addEventListener('click', entrar);
-    document.getElementById('senhaInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
+    document.getElementById('formLogin').addEventListener('submit', (e) => { e.preventDefault(); entrar(); });
+    document.getElementById('mostrarSenhaLogin').addEventListener('click', (e) => { const campo = document.getElementById('senhaInput'); const mostrando = campo.type === 'password'; campo.type = mostrando ? 'text' : 'password'; e.currentTarget.setAttribute('aria-label', mostrando ? 'Ocultar senha' : 'Mostrar senha'); e.currentTarget.setAttribute('aria-pressed', String(mostrando)); });
     document.getElementById('fecharDetalhe').addEventListener('click', fecharDetalhe);
     document.getElementById('trajetoBtn').addEventListener('click', verTrajetoDeHoje);
     document.getElementById('buscaInput').addEventListener('input', renderizarLista);
@@ -311,8 +332,10 @@
       const senha = document.getElementById('senhaInput').value;
       const erroEl = document.getElementById('erro-login');
       const btn = document.getElementById('entrarBtn');
+      if (btn.disabled) return;
       erroEl.textContent = '';
       btn.disabled = true;
+      btn.textContent = 'Entrando…';
 
       try {
         const respLogin = await fetch(API_BASE + '/auth/login', {
@@ -328,6 +351,7 @@
         erroEl.textContent = e.message;
       } finally {
         btn.disabled = false;
+        btn.innerHTML = 'Acessar central <span aria-hidden="true">↗</span>';
       }
     }
 
@@ -409,7 +433,7 @@
     }
 
     function corDoNome(nome) {
-      const paleta = ['#e17076', '#eda86c', '#a695e7', '#7bc862', '#6ec9cb', '#65aadd', '#ee7aae', '#f2777a'];
+      const paleta = ['#149bc7', '#31576a', '#1c7c94', '#48879c', '#258b9b', '#304c60'];
       let hash = 0;
       for (let i = 0; i < nome.length; i++) hash = nome.charCodeAt(i) + ((hash << 5) - hash);
       return paleta[Math.abs(hash) % paleta.length];
