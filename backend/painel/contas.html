@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contas e veículos — Rádio PX</title>
+<style>
+:root{--azul:#229ed9;--escuro:#17324d;--cinza:#66788a;--borda:#dce5ed;--fundo:#f1f5f9}*{box-sizing:border-box}body{margin:0;background:var(--fundo);color:var(--escuro);font:15px system-ui,sans-serif}header{background:#fff;border-bottom:1px solid var(--borda);padding:20px max(24px,calc((100vw - 1140px)/2));display:flex;justify-content:space-between;gap:20px;align-items:center}header strong{font-size:18px}a{color:#126b9b;text-decoration:none}a:hover{text-decoration:underline}main{max-width:1188px;margin:auto;padding:32px 24px 60px}h1{font-size:30px;margin:0 0 8px;letter-spacing:-.6px}h2{font-size:20px;margin:0 0 8px}p{line-height:1.55}.introducao{color:var(--cinza);margin:0 0 28px}.grade{display:grid;grid-template-columns:1.15fr .85fr;gap:24px;align-items:start}.cartao{background:white;border:1px solid var(--borda);border-radius:18px;padding:26px;margin-bottom:24px;box-shadow:0 6px 20px #17324d05}.subtitulo{color:var(--cinza);font-size:13px;margin:0 0 22px}.campos{display:grid;grid-template-columns:1fr 1fr;gap:18px}.campo{display:flex;flex-direction:column;gap:7px}.inteiro{grid-column:1/-1}label{font-size:13px;font-weight:650}input,select{font:inherit;width:100%;padding:12px;border:1px solid #cbd8e3;border-radius:9px;background:#fff;color:var(--escuro)}input:focus,select:focus{outline:3px solid #229ed922;border-color:var(--azul)}input:disabled,select:disabled{background:#f4f7f9}input[type=checkbox]{width:18px;height:18px;margin:0}.opcao{display:flex;align-items:center;gap:10px;font-weight:500}.ajuda{font-size:12px;color:var(--cinza);margin:0;line-height:1.5}.veiculo-novo{border:1px dashed #91bdd5;border-radius:12px;padding:16px;background:#f5fbff}.acoes{display:flex;gap:12px;align-items:center;margin-top:22px;flex-wrap:wrap}button{font:inherit;font-weight:650;background:var(--azul);color:#fff;padding:12px 18px;border:0;border-radius:9px;cursor:pointer}button:hover{background:#197eaf}button:disabled{opacity:.55;cursor:wait}.secundario{background:#eef3f7;color:#345269}.secundario:hover{background:#e2ebf1}.estado{font-size:13px;min-height:20px;margin:14px 0 0}.estado[data-tipo=erro]{color:#b42318}.estado[data-tipo=sucesso]{color:#187546}fieldset{padding:0;border:0;margin:0;min-width:0}legend{font-weight:650;font-size:14px;margin:0 0 12px}details summary{cursor:pointer;color:#126b9b;font-weight:650;margin-bottom:18px}.lista-veiculos{list-style:none;margin:0;padding:0}.lista-veiculos li{padding:12px 0;border-top:1px solid var(--borda)}.lista-veiculos strong{display:block;font-size:14px}.lista-veiculos span{font-size:12px;color:var(--cinza)}.cabecalho-lista{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.quantidade{background:#e7f4fc;color:#15719f;font-size:13px;border-radius:20px;padding:5px 12px;white-space:nowrap}.tabela-wrap{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th{text-align:left;font-size:12px;color:var(--cinza);padding:12px 14px;background:#f5f8fa}td{padding:14px;border-bottom:1px solid var(--borda)}td:first-child{font-weight:650}.vazio{color:var(--cinza);font-size:13px;padding:12px 0}[hidden]{display:none!important}@media(max-width:850px){.grade{grid-template-columns:1fr}}@media(max-width:520px){main{padding:24px 14px}header{padding:16px;flex-wrap:wrap}.cartao{padding:20px}.campos{grid-template-columns:1fr}.inteiro{grid-column:auto}h1{font-size:25px}}
+</style>
+</head>
+<body>
+<header><strong>Rádio PX <span style="font-weight:400;color:#66788a">/ Administração</span></strong><a href="/painel/">← Voltar à central</a></header>
+<main>
+<h1>Contas e veículos</h1>
+<p class="introducao">Cadastre os caminhoneiros da sua empresa e o veículo utilizado por cada um.</p>
+<p id="acesso" class="estado" role="alert">Verificando acesso…</p>
+<div id="conteudo" hidden>
+<div class="grade">
+<section class="cartao" aria-labelledby="titulo-conta">
+<h2 id="titulo-conta">Nova conta de caminhoneiro</h2>
+<p class="subtitulo">O CPF será o login no aplicativo. O caminhoneiro entra com a senha definida abaixo.</p>
+<form id="form-conta">
+<fieldset id="campos-conta"><div class="campos">
+<div class="campo"><label for="nome">Nome</label><input id="nome" name="nome" required maxlength="80" autocomplete="given-name" placeholder="Nome do caminhoneiro"></div>
+<div class="campo"><label for="sobrenome">Sobrenome</label><input id="sobrenome" name="sobrenome" required maxlength="120" autocomplete="family-name" placeholder="Sobrenome do caminhoneiro"></div>
+<div class="campo inteiro"><label for="cpf">CPF</label><input id="cpf" name="cpf" required inputmode="numeric" minlength="14" maxlength="14" autocomplete="off" placeholder="000.000.000-00" aria-describedby="ajuda-cpf"><p id="ajuda-cpf" class="ajuda">Usado para entrar no app. Cada CPF pode ter uma conta.</p></div>
+<div class="campo"><label for="senha">Senha</label><input id="senha" name="senha" type="password" required minlength="8" maxlength="72" autocomplete="new-password" aria-describedby="ajuda-senha"></div>
+<div class="campo"><label for="confirmacao-senha">Confirmação da senha</label><input id="confirmacao-senha" name="confirmacao_senha" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></div>
+<p id="ajuda-senha" class="ajuda inteiro">Use pelo menos 8 caracteres. A confirmação precisa ser igual à senha.</p>
+<label class="opcao inteiro"><input id="mostrar-senhas" type="checkbox"> Mostrar senhas</label>
+<div class="campo inteiro"><label for="veiculo">Veículo utilizado</label><select id="veiculo" required><option value="">Carregando veículos…</option></select></div>
+<label class="opcao inteiro"><input id="novo-veiculo" type="checkbox"> Cadastrar um novo veículo nesta conta</label>
+<div id="novo-veiculo-campos" class="veiculo-novo inteiro" hidden><div class="campos">
+<div class="campo"><label for="veiculo-descricao">Nome/modelo do veículo</label><input id="veiculo-descricao" maxlength="100" placeholder="Ex.: Volvo FH 540"></div>
+<div class="campo"><label for="veiculo-placa">Placa</label><input id="veiculo-placa" maxlength="8" autocomplete="off" placeholder="ABC1D23"></div>
+</div><p class="ajuda" style="margin-top:10px">O veículo será cadastrado e vinculado ao caminhoneiro ao criar a conta.</p></div>
+</div></fieldset>
+<div class="acoes"><button id="criar-conta" type="submit">Criar conta</button><button id="limpar-conta" class="secundario" type="button">Limpar campos</button></div>
+<p id="estado-conta" class="estado" role="status" aria-live="polite"></p>
+</form>
+</section>
+<aside>
+<section class="cartao" aria-labelledby="titulo-veiculos"><div class="cabecalho-lista"><h2 id="titulo-veiculos">Veículos da empresa</h2><span id="total-veiculos" class="quantidade">0 veículos</span></div>
+<details id="cadastro-veiculo"><summary>Cadastrar veículo separadamente</summary><form id="form-veiculo"><fieldset id="campos-veiculo"><div class="campos">
+<div class="campo inteiro"><label for="cadastro-descricao">Nome/modelo</label><input id="cadastro-descricao" required maxlength="100" placeholder="Ex.: Scania R 450"></div>
+<div class="campo inteiro"><label for="cadastro-placa">Placa</label><input id="cadastro-placa" required maxlength="8" autocomplete="off" placeholder="ABC1234"></div>
+</div></fieldset><div class="acoes"><button id="salvar-veiculo" type="submit">Cadastrar veículo</button></div><p id="estado-veiculo" class="estado" role="status"></p></form></details>
+<ul id="lista-veiculos" class="lista-veiculos"></ul>
+</section>
+<section class="cartao"><h2>Como o caminhoneiro entra</h2><p class="subtitulo" style="margin-bottom:0">Após criar a conta, informe o CPF e a senha ao caminhoneiro. Ele abre o app, conecta à central e faz login. O nome completo identifica as falas e a localização no painel.</p></section>
+</aside>
+</div>
+<section class="cartao" aria-labelledby="titulo-motoristas"><div class="cabecalho-lista"><h2 id="titulo-motoristas">Caminhoneiros cadastrados</h2><span id="total-motoristas" class="quantidade">0 contas</span></div><button id="atualizar-listas" class="secundario" type="button">Atualizar lista</button><p id="estado-listas" class="estado" role="status"></p><div class="tabela-wrap"><table><thead><tr><th>Nome completo</th><th>CPF</th><th>Login no app</th><th>Veículo</th></tr></thead><tbody id="lista-motoristas"></tbody></table></div></section>
+</div>
+</main>
+<script src="/painel/contas.js"></script>
+</body></html>
