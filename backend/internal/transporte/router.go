@@ -49,6 +49,7 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	posicoesHandler := NovoPosicoesHandler(servicoPosicoes)
 	wsHandler := ws.NovoHandler(gerenciadorCanais, servicoCanais, repositorioCanais, repositorioUsuarios)
 	painelWsHandler := ws.NovoPainelHandler(broadcasterPosicoes)
+	centralHandler := ws.NovaCentralHandler(gerenciadorCanais, repositorioCanais)
 
 	r.Post("/auth/login", authHandler.Login)
 
@@ -70,6 +71,8 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 
 		r.Get("/ws", wsHandler.ServeHTTP)
 		r.Get("/ws/painel", painelWsHandler.ServeHTTP)
+		r.Get("/central/canais", centralHandler.Listar)
+		r.Get("/ws/central", centralHandler.ServeHTTP)
 	})
 
 	r.Handle("/painel/*", http.StripPrefix("/painel/", http.FileServerFS(painel.Arquivos)))
