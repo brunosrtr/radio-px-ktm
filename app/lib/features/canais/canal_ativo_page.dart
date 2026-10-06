@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../core/theme.dart';
 import '../../services/audio_service.dart';
@@ -37,7 +38,7 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   bool _conexaoEncerrada = false;
 
   bool _conectado = false;
-  bool _audioDestravado = false;
+  bool _audioDestravado = !kIsWeb;
   bool _filaCheia = false;
   bool get _gravando => _ptt.gravando;
   bool get _aguardandoSlot => _ptt.aguardando;
@@ -47,10 +48,15 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   String? _avisoRemocao;
 
   Timer? _timeoutConexao;
+  Timer? _reconexaoTimer;
+  Future<void>? _reconectando;
+  bool _servicosIniciados = false;
+  bool _reconexaoPermitida = true;
 
   @override
   void initState() {
     super.initState();
+    _audioService.aoFalharReproducao = _falharAudio;
     _ptt = ControladorPtt(
       solicitarSlot: () => _canalService.solicitarSlot(widget.canalId),
       finalizarTransmissao: _canalService.finalizarTransmissao,
@@ -58,10 +64,14 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       iniciarGravacao: _audioService.iniciarGravacao,
       pararGravacao: _audioService.pararGravacao,
       enviarAudio: _canalService.enviarChunkAudio,
-      aoMudar: () { if (mounted && !_encerrando) setState(() {}); },
-      aoFalhar: (_) {
+      aoMudar: () {
+        if (mounted && !_encerrando) setState(() {});
+      },
+      aoFalhar: (erro) {
         if (mounted && !_encerrando) {
-          setState(() => _avisoRemocao = 'Não foi possível transmitir. Verifique a permissão do microfone.');
+          setState(
+            () => _avisoRemocao = erro is FalhaAudio ? erro.mensagem : 'Não foi possível transmitir. Solte o botão e tente novamente.',
+          );
         }
       },
     );
@@ -96,9 +106,24 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       await BackgroundService.iniciar();
       if (_encerrando) return;
       await _localizacaoService.iniciar();
+      _servicosIniciados = true;
+    } on FalhaAudio catch (erro) {
+      _falharAudio(erro);
     } catch (_) {
       _perderConexao();
     }
+  }
+
+  void _falharAudio(Object erro) {
+    _reconexaoPermitida = false;
+    _reconexaoTimer?.cancel();
+    _perderConexao();
+    if (!mounted || _encerrando) return;
+    setState(
+      () => _avisoRemocao = erro is FalhaAudio
+          ? erro.mensagem
+          : 'Não foi possível iniciar o áudio do canal.',
+    );
   }
 
   void _perderConexao() {
@@ -110,8 +135,56 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     setState(() {
       _conectado = false;
       _remetenteFalando = null;
-      _avisoRemocao = 'Conexão com o canal encerrada. Volte e entre novamente.';
+      _avisoRemocao =
+          'Conexão perdida. Procurando o computador para reconectar…';
     });
+    _agendarReconexao();
+  }
+
+  void _agendarReconexao() {
+    if (_encerrando || !_reconexaoPermitida) return;
+    _reconexaoTimer?.cancel();
+    _reconexaoTimer = Timer(const Duration(seconds: 5), () {
+      if (_encerrando || !_reconexaoPermitida) return;
+      _reconectando = _reconectar();
+    });
+  }
+
+  Future<void> _reconectar() async {
+    try {
+      await _inicializacao;
+      if (_encerrando) return;
+      await _ptt.interromper();
+      await _assinaturaEventos?.cancel();
+      await _canalService.desconectar();
+      if (_encerrando) return;
+      await _audioService.pararReproducao();
+      await _audioService.iniciarReproducao();
+      if (_encerrando) return;
+      await _canalService.conectar();
+      if (_encerrando) return;
+      _conexaoEncerrada = false;
+      _assinaturaEventos = _canalService.eventos.listen(
+        _processarEvento,
+        onDone: _perderConexao,
+        onError: (Object _) => _perderConexao(),
+      );
+      _canalService.entrarCanal(widget.canalId);
+      _timeoutConexao = Timer(const Duration(seconds: 10), () {
+        if (!_conectado) _perderConexao();
+      });
+      if (!_servicosIniciados) {
+        await BackgroundService.iniciar();
+        if (_encerrando) return;
+        await _localizacaoService.iniciar();
+        _servicosIniciados = true;
+      }
+    } on FalhaAudio catch (erro) {
+      _falharAudio(erro);
+    } catch (_) {
+      _conexaoEncerrada = true;
+      _agendarReconexao();
+    }
   }
 
   void _processarEvento(EventoCanal evento) {
@@ -129,6 +202,8 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         final participantes = evento.dados?['participantes'] as int?;
         setState(() {
           _conectado = true;
+          _avisoRemocao = null;
+          _filaCheia = false;
           if (tamanhoFila != null) {
             _tamanhoFila = tamanhoFila;
             _filaCheia = tamanhoFila >= 10;
@@ -138,10 +213,12 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         break;
 
       case 'slot_concedido':
-        unawaited(_ptt.conceder(
-          evento.dados!['transmissao_id'] as String,
-          Duration(milliseconds: evento.dados!['duracao_maxima_ms'] as int),
-        ));
+        unawaited(
+          _ptt.conceder(
+            evento.dados!['transmissao_id'] as String,
+            Duration(milliseconds: evento.dados!['duracao_maxima_ms'] as int),
+          ),
+        );
         break;
 
       case 'slot_negado':
@@ -150,26 +227,34 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         break;
 
       case 'transmissao_encerrada':
-        unawaited(_ptt.servidorEncerrou(evento.dados!['transmissao_id'] as String));
+        unawaited(
+          _ptt.servidorEncerrou(evento.dados!['transmissao_id'] as String),
+        );
         break;
 
       case 'inicio_reproducao':
+        _audioService.iniciarRecepcao();
         setState(
           () => _remetenteFalando = evento.dados?['remetente_nome'] as String?,
         );
         break;
 
       case 'fim_reproducao':
+        _audioService.encerrarRecepcao();
         setState(() => _remetenteFalando = null);
         break;
 
       case 'removido_canal':
+        _reconexaoPermitida = false;
+        _reconexaoTimer?.cancel();
         _conexaoEncerrada = true;
         unawaited(_ptt.interromper());
         unawaited(_audioService.pararReproducao());
         _conectado = false;
         setState(
-          () => _avisoRemocao = _mensagemRemocao(evento.dados?['motivo'] as String?),
+          () => _avisoRemocao = _mensagemRemocao(
+            evento.dados?['motivo'] as String?,
+          ),
         );
         break;
 
@@ -178,9 +263,15 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       // estado de espera — sem isso o botão fica preso em "aguardando"
       // indefinidamente, sem nenhum feedback pro usuário.
       case 'erro':
+        if (!_conectado) {
+          _reconexaoPermitida = false;
+          _timeoutConexao?.cancel();
+          _reconexaoTimer?.cancel();
+        }
         _ptt.negar();
         setState(() {
-          _avisoRemocao = evento.dados?['mensagem'] as String? ??
+          _avisoRemocao =
+              evento.dados?['mensagem'] as String? ??
               'Não foi possível completar a ação.';
         });
         break;
@@ -210,6 +301,7 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   @override
   void dispose() {
     _encerrando = true;
+    _reconexaoTimer?.cancel();
     _timeoutConexao?.cancel();
     unawaited(_ptt.fechar());
     unawaited(_encerrarRecursos());
@@ -218,6 +310,7 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
 
   Future<void> _encerrarRecursos() async {
     await _inicializacao;
+    await _reconectando;
     await _ptt.fechar();
     await _assinaturaEventos?.cancel();
     _canalService.sairCanal(widget.canalId);
@@ -230,7 +323,7 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   void _destravarAudioSeNecessario() {
     if (_audioDestravado) return;
     setState(() => _audioDestravado = true);
-    unawaited(_audioService.destravarAudioNoToque());
+    unawaited(_audioService.destravarAudioNoToque().catchError(_falharAudio));
   }
 
   String _iniciais(String nome) {
@@ -252,7 +345,11 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.redAccent,
+                        size: 40,
+                      ),
                       const SizedBox(height: 12),
                       Text(_avisoRemocao!, textAlign: TextAlign.center),
                       const SizedBox(height: 20),
@@ -296,73 +393,74 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) => _destravarAudioSeNecessario(),
         child: Column(
-        children: [
-          if (!_audioDestravado)
-            MaterialBanner(
-              content: const Text('🔊 Toque em qualquer lugar da tela para ativar o áudio'),
-              actions: [
-                TextButton(
-                  onPressed: _destravarAudioSeNecessario,
-                  child: const Text('Ativar'),
+          children: [
+            if (!_audioDestravado)
+              MaterialBanner(
+                content: const Text(
+                  '🔊 Toque em qualquer lugar da tela para ativar o áudio',
                 ),
-              ],
-            ),
-          if (_avisoRemocao != null)
-            MaterialBanner(
-              content: Text(_avisoRemocao!),
-              actions: [
-                TextButton(
-                  onPressed: () => setState(() => _avisoRemocao = null),
-                  child: const Text('OK'),
+                actions: [
+                  TextButton(
+                    onPressed: _destravarAudioSeNecessario,
+                    child: const Text('Ativar'),
+                  ),
+                ],
+              ),
+            if (_avisoRemocao != null)
+              MaterialBanner(
+                content: Text(_avisoRemocao!),
+                actions: [
+                  TextButton(
+                    onPressed: () => setState(() => _avisoRemocao = null),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            Expanded(
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: falando
+                      ? _bolhaFalando(_remetenteFalando!)
+                      : _filaCheia
+                      ? const _AvisoCentral(
+                          icone: Icons.hourglass_top,
+                          texto: 'Fila cheia — aguarde para falar',
+                          cor: Colors.orange,
+                        )
+                      : const _AvisoCentral(
+                          icone: Icons.radio,
+                          texto: 'Canal em silêncio',
+                          cor: Colors.white38,
+                        ),
                 ),
-              ],
-            ),
-          Expanded(
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: falando
-                    ? _bolhaFalando(_remetenteFalando!)
-                    : _filaCheia
-                    ? const _AvisoCentral(
-                        icone: Icons.hourglass_top,
-                        texto: 'Fila cheia — aguarde para falar',
-                        cor: Colors.orange,
-                      )
-                    : const _AvisoCentral(
-                        icone: Icons.radio,
-                        texto: 'Canal em silêncio',
-                        cor: Colors.white38,
-                      ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 40, top: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _botaoFalar(podeFalar),
-                const SizedBox(height: 12),
-                Text(
-                  _gravando
-                      ? 'Transmitindo…'
-                      : _aguardandoSlot
-                      ? 'Aguardando vez na fila…'
-                      : podeFalar
-                      ? 'Segure para falar'
-                      : 'Aguarde',
-                  style: TextStyle(
-                    color: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.color?.withValues(alpha: 0.8),
-                    fontSize: 13,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 40, top: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _botaoFalar(podeFalar),
+                  const SizedBox(height: 12),
+                  Text(
+                    _gravando
+                        ? 'Transmitindo…'
+                        : _aguardandoSlot
+                        ? 'Aguardando vez na fila…'
+                        : podeFalar
+                        ? 'Segure para falar'
+                        : 'Aguarde',
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.bodySmall?.color
+                          ?.withValues(alpha: 0.8),
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
