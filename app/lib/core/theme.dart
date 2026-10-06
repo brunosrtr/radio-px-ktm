@@ -7,18 +7,16 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const azulPrimario = Color(0xFF2AABEE);
-  static const azulSecundario = Color(0xFF229ED9);
+  static const azulPrimario = Color(0xFF41C1F0);
+  static const azulSecundario = Color(0xFF087FA9);
 
   static const paletaAvatares = [
-    Color(0xFFE17076),
-    Color(0xFFEDA86C),
-    Color(0xFFA695E7),
-    Color(0xFF7BC862),
-    Color(0xFF6EC9CB),
-    Color(0xFF65AADD),
-    Color(0xFFEE7AAE),
-    Color(0xFFF2777A),
+    Color(0xFF149BC7),
+    Color(0xFF31576A),
+    Color(0xFF1C7C94),
+    Color(0xFF48879C),
+    Color(0xFF258B9B),
+    Color(0xFF304C60),
   ];
 
   static Color corDoAvatar(String nome) {
@@ -32,9 +30,9 @@ class AppTheme {
   static ThemeData get light => ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(seedColor: azulPrimario),
-    scaffoldBackgroundColor: const Color(0xFFEEF2F5),
+    scaffoldBackgroundColor: const Color(0xFFF3F6F8),
     appBarTheme: const AppBarTheme(
-      backgroundColor: azulPrimario,
+      backgroundColor: const Color(0xFF080D12),
       foregroundColor: Colors.white,
       centerTitle: false,
       elevation: 0,
@@ -64,16 +62,16 @@ class AppTheme {
       seedColor: azulPrimario,
       brightness: Brightness.dark,
     ),
-    scaffoldBackgroundColor: const Color(0xFF17212B),
+    scaffoldBackgroundColor: const Color(0xFF080D12),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1E2C3A),
+      backgroundColor: Color(0xFF101B23),
       foregroundColor: Colors.white,
       centerTitle: false,
       elevation: 0,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF242F3D),
+      fillColor: const Color(0xFF16252F),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -82,7 +80,7 @@ class AppTheme {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: azulPrimario,
+        backgroundColor: const Color(0xFF080D12),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
