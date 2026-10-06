@@ -37,7 +37,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := h.usuarios.BuscarPorLogin(r.Context(), corpo.Login)
+	u, err := h.usuarios.BuscarPorLogin(r.Context(), usuario.NormalizarLogin(corpo.Login))
 	if err != nil {
 		responderErro(w, http.StatusUnauthorized, "credenciais_invalidas", "login ou senha incorretos")
 		return
