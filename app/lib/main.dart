@@ -6,6 +6,7 @@ import 'core/routes.dart';
 import 'core/rede_local.dart';
 import 'core/theme.dart';
 import 'features/auth/login_page.dart';
+import 'features/auth/sobre_page.dart';
 import 'features/canais/lista_canais_page.dart';
 
 Future<void> main() async {
@@ -27,6 +28,7 @@ class RadioPxApp extends StatelessWidget {
       initialRoute: AppRoutes.login,
       routes: {
         AppRoutes.login: (_) => const LoginPage(),
+        AppRoutes.sobre: (_) => const SobrePage(),
         AppRoutes.canais: (_) => const ListaCanaisPage(),
       },
     );

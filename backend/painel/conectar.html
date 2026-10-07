@@ -4,14 +4,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Conectar celulares — Rádio PX KTM</title>
 <style>
-body{font:16px system-ui,sans-serif;background:#eef3f8;color:#17324d;margin:0;padding:32px}
+body{font:16px system-ui,sans-serif;background:#eef3f8;color:#17324d;margin:0}
 main{max-width:720px;margin:auto;background:white;border-radius:20px;padding:28px}
 h1{font-size:26px}button,a{color:#12628c}button{padding:12px;cursor:pointer}
 #enderecos{display:flex;flex-wrap:wrap;gap:20px}figure{margin:16px 0;max-width:320px}
 img{width:100%;max-width:320px}figcaption{overflow-wrap:anywhere}#estado{min-height:24px}
 </style>
+<link rel="stylesheet" href="/painel/marca.css?v=ktm1">
+<body class="pairing-page"><header class="site-header"><a href="/painel/" aria-label="KTM — central"><img class="ktm-logo" src="/painel/assets/logo-ktm.png" alt="KTM Indústria"></a><nav class="site-nav"><a href="/painel/sobre.html">Sobre nós</a><a href="/painel/" class="nav-cta">← Voltar à central</a></nav></header>
 <main>
-<a href="/painel/">Voltar ao painel</a>
+<div class="eyebrow">Sua equipe conectada</div>
 <h1>Conectar celulares</h1>
 <p>Conecte o computador e os celulares ao mesmo Wi-Fi. O aplicativo procura o computador automaticamente.</p>
 <p>Se ele não encontrar, toque em <strong>Ler QR Code</strong> na tela de login e aponte a câmera para um dos códigos abaixo.</p>
@@ -61,4 +63,4 @@ document.getElementById('atualizar').addEventListener('click', atualizar);
 atualizar();
 setInterval(atualizar, 10000);
 </script>
-</html>
+</body></html>

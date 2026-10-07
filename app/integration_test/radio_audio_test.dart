@@ -90,7 +90,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), 'motorista1');
     await tester.enterText(find.byType(TextFormField).at(1), 'motorista123');
-    await tester.tap(find.text('Entrar'));
+    await tester.tap(find.text('Entrar no Rádio PX'));
     await aguardar(
       tester,
       () => find.text(canal['nome'] as String).evaluate().isNotEmpty,

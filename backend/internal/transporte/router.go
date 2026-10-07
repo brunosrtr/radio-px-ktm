@@ -31,6 +31,13 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	r.Use(middleware.Recoverer)
 	r.Use(corsMiddleware)
 
+	// O endereço principal abre o painel; as rotas da API continuam explícitas.
+	abrirPainel := func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/painel/", http.StatusFound)
+	}
+	r.Get("/", abrirPainel)
+	r.Get("/painel", abrirPainel)
+
 	r.Get("/health", handlerHealth(pool))
 
 	gerenciadorCanais := canal.NovoGerenciador()
@@ -45,6 +52,7 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 	servicoPosicoes := posicao.NovoServico(repositorioPosicoes, verificadorGeocerca, broadcasterPosicoes)
 
 	authHandler := NovoAuthHandler(repositorioUsuarios, cfg.JWTSecret)
+	cadastrosHandler := NovoCadastrosHandler(repositorioUsuarios)
 	canaisHandler := NovoCanaisHandler(servicoCanais)
 	posicoesHandler := NovoPosicoesHandler(servicoPosicoes)
 	wsHandler := ws.NovoHandler(gerenciadorCanais, servicoCanais, repositorioCanais, repositorioUsuarios)
@@ -57,6 +65,10 @@ func NovoRoteador(cfg config.Config, pool *storage.Pool) chi.Router {
 		r.Use(auth.Middleware(cfg.JWTSecret))
 
 		r.Get("/me", authHandler.Me)
+		r.Get("/admin/motoristas", cadastrosHandler.ListarMotoristas)
+		r.Post("/admin/motoristas", cadastrosHandler.CriarMotorista)
+		r.Get("/admin/veiculos", cadastrosHandler.ListarVeiculos)
+		r.Post("/admin/veiculos", cadastrosHandler.CriarVeiculo)
 
 		r.Get("/canais", canaisHandler.Listar)
 		r.Post("/canais", canaisHandler.Criar)

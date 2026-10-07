@@ -5,5 +5,5 @@ package painel
 
 import "embed"
 
-//go:embed *.html *.js
+//go:embed *.html *.js *.css assets/*
 var Arquivos embed.FS
