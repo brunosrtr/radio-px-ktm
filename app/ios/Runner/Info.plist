@@ -2,14 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSLocalNetworkUsageDescription</key>
-    <string>Encontrar o computador da empresa e comunicar com ele pelo Wi-Fi.</string>
-    <key>NSBonjourServices</key>
-    <array><string>_radiopx._tcp</string></array>
-    <key>NSCameraUsageDescription</key>
-    <string>Ler o QR Code de conexão exibido no computador da empresa.</string>
-    <key>NSAppTransportSecurity</key>
-    <dict><key>NSAllowsLocalNetworking</key><true/></dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.pravera.flutter_foreground_task.refresh</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -34,6 +30,23 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_radiopx._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Ler o QR Code de conexão exibido no computador da empresa.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Encontrar o computador da empresa e comunicar com ele pelo Wi-Fi.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Enviar sua posição à empresa e liberar canais restritos por área.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Transmitir sua voz no canal ao segurar o botão de falar.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -57,6 +70,11 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>fetch</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
