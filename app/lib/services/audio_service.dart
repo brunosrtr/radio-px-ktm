@@ -2,13 +2,33 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:opus_dart/opus_dart.dart';
 import 'package:opus_flutter_new/opus_flutter_new.dart' as opus_flutter;
 import 'package:permission_handler/permission_handler.dart';
 
 import 'codec_voz.dart';
+
+/// Quantos bytes do bloco o player consumiu em `feedUint8FromStream`.
+///
+/// No Android o flutter_sound grava o bloco inteiro numa thread e devolve
+/// apenas um sinal de controle de fluxo (1), não a contagem de bytes; tratar
+/// esse 1 como byte desalinha as amostras PCM16 e vira chiado. No iOS o
+/// retorno é a contagem real.
+int bytesAceitosPeloPlayer({
+  required int retorno,
+  required int restantes,
+  required TargetPlatform plataforma,
+}) {
+  if (retorno <= 0) throw StateError('O player não aceitou o áudio.');
+  if (plataforma == TargetPlatform.android) return restantes;
+  if (retorno > restantes || retorno.isOdd) {
+    throw StateError('O player não aceitou o áudio.');
+  }
+  return retorno;
+}
 
 class FalhaAudio implements Exception {
   const FalhaAudio(this.mensagem);
@@ -172,10 +192,11 @@ class AudioService {
               .feedUint8FromStream(Uint8List.sublistView(pcm, offset))
               .timeout(const Duration(seconds: 5));
           if (!_reproduzindo || geracao != _geracao) return;
-          if (usados <= 0 || usados > pcm.length - offset) {
-            throw StateError('O player não aceitou o áudio.');
-          }
-          offset += usados;
+          offset += bytesAceitosPeloPlayer(
+            retorno: usados,
+            restantes: pcm.length - offset,
+            plataforma: defaultTargetPlatform,
+          );
         }
       }
     } catch (erro) {
