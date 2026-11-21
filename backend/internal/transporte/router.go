@@ -16,6 +16,7 @@ import (
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/email"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/geofence"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/notificacao"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/orbit"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/posicao"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
@@ -76,6 +77,22 @@ func NovoRoteadorCom(cfg config.Config, pool *storage.Pool, deps Dependencias) c
 	painelWsHandler := ws.NovoPainelHandler(broadcasterPosicoes)
 	centralHandler := ws.NovaCentralHandler(gerenciadorCanais, repositorioCanais)
 
+	// Rede Orbit (003-rede-orbit): o painel ao vivo é sempre uma integração;
+	// a da KTM entra quando KTM_INTEGRACAO_URL estiver configurada.
+	broadcasterRede := orbit.NovoBroadcaster()
+	integracoes := []orbit.Integracao{orbit.IntegracaoPainel{Broadcaster: broadcasterRede}}
+	if cfg.KTMIntegracaoURL != "" {
+		integracoes = append(integracoes, orbit.NovaIntegracaoHTTP(cfg.KTMIntegracaoURL))
+	}
+	segredoPontoID := cfg.PontoIDSegredo
+	if segredoPontoID == "" {
+		segredoPontoID = "ponto-id|" + cfg.JWTSecret
+	}
+	servicoOrbit := orbit.NovoServico(orbit.NovoRepositorio(pool), orbit.NovoPontosAtivos(), segredoPontoID, integracoes...)
+	leiturasHandler := NovoLeiturasHandler(servicoOrbit, repositorioUsuarios)
+	redeHandler := NovoRedeHandler(servicoOrbit)
+	redeWsHandler := ws.NovoRedeHandler(servicoOrbit, broadcasterRede)
+
 	limitadorContas := deps.LimitadorContas
 	if limitadorContas == nil {
 		limitadorContas = NovoLimitador(5, 10*time.Minute)
@@ -109,6 +126,21 @@ func NovoRoteadorCom(cfg config.Config, pool *storage.Pool, deps Dependencias) c
 		r.Post("/posicoes", posicoesHandler.Receber)
 		r.Get("/empresas/{id}/posicoes-atuais", posicoesHandler.PosicoesAtuais)
 		r.Get("/motoristas/{id}/trajeto", posicoesHandler.Trajeto)
+
+		r.Post("/leituras", leiturasHandler.Receber)
+		r.Post("/ponto/sinal", leiturasHandler.Sinal)
+		r.Get("/me/contribuicao", leiturasHandler.Contribuicao)
+
+		r.Route("/rede", func(r chi.Router) {
+			r.Use(SomenteAdminKTM)
+			r.Get("/orbits", redeHandler.Orbits)
+			r.Get("/orbits/{id}/leituras", redeHandler.Leituras)
+			r.Get("/pontos-fixos", redeHandler.PontosFixos)
+			r.Post("/pontos-fixos", redeHandler.CriarPontoFixo)
+			r.Delete("/pontos-fixos/{id}", redeHandler.ApagarPontoFixo)
+			r.Post("/pontos-fixos/{id}/simular", redeHandler.Simular)
+		})
+		r.Get("/ws/rede", redeWsHandler.ServeHTTP)
 
 		r.Get("/ws", wsHandler.ServeHTTP)
 		r.Get("/ws/painel", painelWsHandler.ServeHTTP)

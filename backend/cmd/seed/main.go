@@ -1,10 +1,15 @@
 // Comando seed cria uma empresa e três usuários de teste (um admin, dois
 // motoristas) para exercitar o app e o painel manualmente em ambiente local,
 // sem depender de telas de gestão ainda não implementadas.
+//
+// Com -demo, cria em vez disso os dados da demonstração da Rede Orbit
+// (quickstart.md da 003-rede-orbit): contas admin_ktm e demo, três Orbits
+// virtuais e quatro pontos fixos simulados. O -demo pode rodar várias vezes.
 package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
@@ -24,6 +29,8 @@ var contas = []struct {
 }
 
 func main() {
+	demo := flag.Bool("demo", false, "cria os dados da demonstração da Rede Orbit")
+	flag.Parse()
 	ctx := context.Background()
 
 	cfg, err := config.Load()
@@ -39,6 +46,13 @@ func main() {
 
 	if err := pool.AplicarMigracoes(ctx); err != nil {
 		log.Fatalf("erro ao aplicar migrações: %v", err)
+	}
+
+	if *demo {
+		if err := semearDemo(ctx, pool); err != nil {
+			log.Fatalf("erro ao criar dados da demonstração: %v", err)
+		}
+		return
 	}
 
 	empresas := empresa.NovoRepositorio(pool)

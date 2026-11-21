@@ -144,9 +144,68 @@
 
 ---
 
-## Etapa 2 — Rede Orbit: backend e painel (US3, base de US1/US2) · *a detalhar*
+## Etapa 2 — Rede Orbit: backend e painel (US3, base de US1/US2)
 
-Migração `0005_rede_orbit.sql`; pacote `backend/internal/orbit/` (validação do lote, repositório com ingestão idempotente e atualização condicional 🔒, `ponto_id` HMAC rotativo, pontos ativos em memória, `Integracao` + `IntegracaoPainel`); `POST /leituras`, `/ponto/sinal`, `/me/contribuicao`; rotas `/rede/*` e `/ws/rede` para `admin_ktm`; `backend/painel/rede.html`; seed `-demo`; `PONTO_ID_SEGREDO` no `.env.example`.
+**Objetivo**: o backend recebe lotes de leituras Orbit, guarda sem identificar quem leu, mantém a última posição de cada Orbit e mostra tudo ao vivo no painel Rede Orbit.
+
+**Critério de aceite**: um lote enviado por `curl` aparece no mapa do painel em < 5 s; reenviar o mesmo lote não duplica; uma leitura mais antiga não move o Orbit; testes obrigatórios 🔒 verdes.
+
+### Configuração e base de dados
+
+- [X] T036 [P] Ler `PONTO_ID_SEGREDO` (opcional; sem ele, derivado de `JWT_SECRET`) e `KTM_INTEGRACAO_URL` (opcional) em `backend/internal/config/config.go`; documentar no `.env.example`
+- [X] T037 Criar `backend/migrations/0005_rede_orbit.sql` com `orbit`, `leitura_orbit`, `ponto_fixo` e `contribuicao_diaria` conforme [data-model.md §4](./data-model.md)
+
+### Pacote `backend/internal/orbit/`
+
+- [X] T038 [P] [US1] `leitura.go`: tipos `LeituraRecebida`/`LeituraRegistrada`/`OrbitResumo`/`PontoFixo` e `ValidarLote` (1–100 leituras, `ORBIT-` + 6 hex, coordenadas válidas, `detectado_em` entre agora − 7 dias e agora + 2 min)
+- [X] T039 [P] [US1] `ponto_id.go`: `PontoID(segredo, usuarioID, instante)` = HMAC-SHA256 truncado em 16 hex, renovado por dia (fuso `America/Sao_Paulo`)
+- [X] T040 [P] [US3] `pontos_ativos.go`: mapa em memória `ponto_id → visto_em`, com `Registrar` e `Contar(janela)` e relógio injetável
+- [X] T041 [US1] `repositorio.go`: `IngerirLote` numa transação. Ela cria os Orbits que faltam, insere as leituras com `on conflict do nothing` (idempotente), atualiza `orbit.ultima_*` **só** com leituras mais recentes e soma em `contribuicao_diaria` só as leituras novas. Também: `Orbits`, `HistoricoOrbit` e CRUD de `ponto_fixo`
+- [X] T042 [P] [US3] `broadcaster.go`: eventos da Rede Orbit para os painéis (não bloqueia; um assinante lento perde o evento)
+- [X] T043 [P] [US3] `integracao.go`: interface `Integracao` + `IntegracaoPainel` (publica no broadcaster) + `IntegracaoHTTP` (POST JSON para `KTM_INTEGRACAO_URL`, só ligada se configurada)
+- [X] T044 [US1] [US3] `service.go`: `IngerirLeituras` (valida, calcula `ponto_id`, grava, registra ponto ativo, encaminha para as integrações sem fazer o lote falhar), `RegistrarSinal`, `Contribuicao`, `SimularPassagem` (leitura de origem `fixo`)
+
+### HTTP e WebSocket
+
+- [X] T045 [US1] Adicionar `TemConsentimento(ctx, usuarioID, tipo)` em `backend/internal/usuario/consentimento.go`
+- [X] T046 [US1] `backend/internal/transporte/leituras_handler.go`: `POST /leituras` (`403 sem_consentimento`, `422 lote_invalido`, `200 {aceitas, duplicadas}`), `POST /ponto/sinal`, `GET /me/contribuicao`
+- [X] T047 [US3] `backend/internal/transporte/rede_handler.go`: `/rede/orbits`, `/rede/orbits/{id}/leituras`, `/rede/pontos-fixos` (GET/POST/DELETE) e `/rede/pontos-fixos/{id}/simular`, todos só para `admin_ktm`
+- [X] T048 [US3] `backend/internal/ws/rede_handler.go`: `/ws/rede` (`admin_ktm`), que envia `inicial`, repassa `leitura`/`orbit_atualizado` e manda `pontos_ativos` a cada 30 s
+- [X] T049 Registrar as rotas e montar o serviço em `backend/internal/transporte/router.go`
+
+### Painel e seed
+
+- [X] T050 [US3] `backend/painel/rede.html`:
+  - login de `admin_ktm`;
+  - mapa Leaflet com os Orbits, pulso a cada leitura, pontos fixos como círculos e botão para mostrar ou ocultar a cobertura fixa;
+  - lista de Orbits com a última leitura;
+  - histórico de 24 h desenhado no mapa;
+  - cadastro de ponto fixo clicando no mapa;
+  - "simular passagem por ponto fixo";
+  - contador de pontos ativos e feed das últimas leituras
+- [X] T051 [US2] [US3] Flag `-demo` em `backend/cmd/seed/main.go`, idempotente:
+  - contas `admin_ktm` e `demo`, com consentimento de ponto de transmissão;
+  - 3 Orbits virtuais com rótulo;
+  - 4 pontos fixos simulados
+
+### Testes
+
+- [X] T052 [P] 🔒 `backend/internal/orbit/leitura_test.go`, validação do lote: tamanho, formato do ID, coordenadas, horário no futuro ou antigo demais
+- [X] T053 [P] 🔒 `backend/internal/orbit/repositorio_test.go`:
+  - reenviar o mesmo lote não duplica;
+  - leitura mais antiga não move o Orbit e leitura mais nova move;
+  - contribuição conta só as leituras novas;
+  - `leitura_orbit` não tem coluna que identifique o usuário
+- [X] T054 [P] `backend/internal/orbit/ponto_id_test.go` e `pontos_ativos_test.go`:
+  - o `ponto_id` muda de um dia para o outro e é diferente para usuários diferentes;
+  - a janela de pontos ativos funciona
+- [X] T055 `backend/internal/transporte/leituras_handler_test.go`:
+  - contrato de `/leituras`, `/ponto/sinal`, `/me/contribuicao` e `/rede/*`;
+  - `403` para quem não tem consentimento e para quem não é `admin_ktm`;
+  - o WebSocket `/ws/rede` recebe `inicial` e depois a `leitura`, sem `usuario_id`, nome ou e-mail no evento (Princípio VII)
+- [X] T056 Rodar `go test ./...` e o critério de aceite com `curl` + painel no navegador
+
+**Checkpoint**: parar e pedir o aceite do usuário (Princípio II).
 
 ## Etapa 3 — Ponto de transmissão e Orbit virtual no app (US1, US2) · *a detalhar*
 

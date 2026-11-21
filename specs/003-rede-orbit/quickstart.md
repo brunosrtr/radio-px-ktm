@@ -29,6 +29,22 @@ Todos na mesma rede do notebook (a descoberta local da 001 continua) ou com `--d
 
 Abra `http://<ip-do-notebook>:8080/painel/rede.html` e entre com a conta `admin_ktm` do seed _(Etapa 2)_.
 
+Contas criadas por `go run ./cmd/seed -demo` (valores de teste, só para ambiente local; o seed pode rodar de novo sem duplicar nada):
+
+| Conta | E-mail | Senha |
+|---|---|---|
+| `admin_ktm` (painel Rede Orbit) | `admin.ktm@demo.radiopx.local` | `demo-ktm-2026` |
+| `demo` (celular do Orbit virtual) | `demo@demo.radiopx.local` | `demo-orbit-2026` |
+
+Para testar o painel sem o app, envie uma leitura com a conta `demo` (que já tem o consentimento de ponto de transmissão):
+
+```bash
+TOKEN=$(curl -s -X POST localhost:8080/auth/login -H 'Content-Type: application/json' \
+  -d '{"identificador":"demo@demo.radiopx.local","senha":"demo-orbit-2026"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+curl -s -X POST localhost:8080/leituras -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"leituras\":[{\"orbit_id\":\"ORBIT-0A1B2C\",\"latitude\":-23.705,\"longitude\":-46.895,\"rssi\":-61,\"detectado_em\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}"
+```
+
 ## 4. Roteiro da apresentação (cerca de 5 minutos)
 
 1. **O problema**: no painel, ative "pontos fixos". Mostre o caminhão `ORBIT-0A1B2C` com a última leitura antiga e os pontos fixos espaçados. Use "simular passagem por ponto fixo" para mostrar como é hoje: só há posição quando o caminhão passa por um pórtico.

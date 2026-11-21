@@ -92,3 +92,20 @@ func (r *Repositorio) ConsentimentosVigentes(ctx context.Context, usuarioID stri
 	}
 	return vigentes, linhas.Err()
 }
+
+// TemConsentimento informa se o usuário tem um aceite vigente do tipo
+// informado — usado para só aceitar leituras Orbit de quem consentiu em ser
+// ponto de transmissão (FR-028).
+func (r *Repositorio) TemConsentimento(ctx context.Context, usuarioID, tipo string) (bool, error) {
+	var tem bool
+	err := r.pool.QueryRow(ctx, `
+		select exists(
+			select 1 from consentimento
+			where usuario_id = $1 and tipo = $2 and revogado_em is null
+		)
+	`, usuarioID, tipo).Scan(&tem)
+	if err != nil {
+		return false, fmt.Errorf("usuario: erro ao verificar consentimento: %w", err)
+	}
+	return tem, nil
+}

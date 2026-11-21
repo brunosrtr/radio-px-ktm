@@ -9,7 +9,8 @@ import (
 // usuario é mantida, anonimizada e inativa, porque participações em canais
 // e consentimentos apontam para ela; o mesmo e-mail pode criar uma conta nova
 // depois. Também apaga o histórico e a posição atual, dispositivos,
-// preferências e códigos de recuperação, e encerra participações abertas.
+// preferências, códigos de recuperação e contadores de contribuição, e
+// encerra participações abertas.
 func (r *Repositorio) ExcluirConta(ctx context.Context, usuarioID string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -44,6 +45,7 @@ func (r *Repositorio) ExcluirConta(ctx context.Context, usuarioID string) error 
 		`delete from dispositivo where usuario_id = $1`,
 		`delete from preferencia_canal where usuario_id = $1`,
 		`delete from recuperacao_senha where usuario_id = $1`,
+		`delete from contribuicao_diaria where usuario_id = $1`,
 		`update participacao_canal set saiu_em = now(), motivo_saida = 'desconexao'
 			where usuario_id = $1 and saiu_em is null`,
 	}
