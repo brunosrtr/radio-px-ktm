@@ -1,7 +1,8 @@
 # Modelo de dados — Rede Orbit (`003-rede-orbit`)
 
-Alterações sobre o modelo da 001 ([data-model.md](../001-radio-px-digital/data-model.md)), aplicadas pela migração
-`backend/migrations/0004_rede_orbit.sql`: idempotente, sem apagar dados (Princípio V). Nenhuma tabela guarda áudio (Princípio I).
+Alterações sobre o modelo da 001 ([data-model.md](../001-radio-px-digital/data-model.md)), em três migrações
+idempotentes e sem apagar dados (Princípio V), uma por etapa: `0004_contas_abertas.sql` (§1, Etapa 1),
+`0005_rede_orbit.sql` (§4, Etapa 2) e `0006_canais_comunidade.sql` (§3, Etapa 6). Nenhuma tabela guarda áudio (Princípio I).
 
 ## 1. Usuário e contas
 

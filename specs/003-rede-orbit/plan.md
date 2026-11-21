@@ -29,7 +29,7 @@ A rádio da 001 (hub em memória, fila FIFO, áudio nunca persistido) não muda.
 
 Ver [research.md](./research.md) §2, §7 e §10.
 
-**Storage**: PostgreSQL, com a migração `0004_rede_orbit.sql` ([data-model.md](./data-model.md)). Hive no app ganha a caixa `fila_leituras`. Os pontos ativos ficam só em memória.
+**Storage**: PostgreSQL, com as migrações `0004_contas_abertas.sql`, `0005_rede_orbit.sql` e `0006_canais_comunidade.sql` ([data-model.md](./data-model.md)). Hive no app ganha a caixa `fila_leituras`. Os pontos ativos ficam só em memória.
 
 **Testing**: `go test` com Postgres real (como na 001) e `flutter test`. Testes obrigatórios novos, pelo Princípio IV ampliado:
 - `DeduplicadorLeituras`;
@@ -67,7 +67,7 @@ Referência: [constitution.md](/.specify/memory/constitution.md) v2.0.0.
 | II. Uma etapa por vez | 8 etapas sequenciais abaixo, cada uma com critério de aceite; a Etapa 4 (protótipo de UX) exige aprovação explícita antes da 5. | PASS |
 | III. Nada de requisito inventado | Spec sem `[NEEDS CLARIFICATION]` (FR-033/034 decididos em 2026-11-21). O protocolo do Orbit real segue como Pendência; o formato do Orbit virtual é declaradamente provisório ([sinal-orbit.md](./contracts/sinal-orbit.md)). | PASS |
 | IV. Testes das regras críticas | Testes da 001 mantidos, mais os 4 testes obrigatórios novos listados em Testing. | PASS (reforçado em tasks.md) |
-| V. Dados explícitos, sem ORM | Migração 0004 em SQL idempotente; repositórios novos com `pgx`. | PASS |
+| V. Dados explícitos, sem ORM | Migrações 0004–0006 em SQL idempotente; repositórios novos com `pgx`. | PASS |
 | VI. Simplicidade | Instância única; pontos ativos e limitador de cadastro em memória; `orbit.Integracao` e `orbit_sinal.dart` são os pontos de troca exigidos. | PASS |
 | VII. Privacidade em mão dupla | `leitura_orbit` usa `ponto_id` opaco e rotativo (HMAC por dia), nunca `usuario_id`; contadores pessoais ficam em `contribuicao_diaria`, que o painel não lê; o app não recebe dados de Orbit; consentimento `ponto_transmissao` separado e revogável. | PASS |
 | Segurança e Configuração | Rotas públicas restritas a cadastro, login e recuperação de senha (mais os textos de termos e privacidade); novos segredos (`PONTO_ID_SEGREDO`, `SMTP_*`, `KTM_INTEGRACAO_URL`) entram no `.env.example`. | PASS |
@@ -80,12 +80,12 @@ Cada etapa só começa após o aceite da anterior (Princípio II). As Etapas 1 a
 
 | # | Etapa | Entrega | Critério de aceite |
 |---|---|---|---|
-| 1 | **Contas abertas** | Migração 0004 (parte de contas), cadastro, login por e-mail ou login, recuperação de senha com Mailpit, consentimentos, exclusão de conta, JWT com `empresa_id` opcional; telas simples de cadastro e recuperação no app | Criar conta pelo app, sair, recuperar a senha pelo Mailpit e entrar de novo; contas antigas de empresa continuam entrando; `go test` verde |
-| 2 | **Rede Orbit, backend e painel** | Tabelas `orbit`, `leitura_orbit`, `ponto_fixo`, `contribuicao_diaria`; `POST /leituras`, `/ponto/sinal`, `/me/contribuicao`; `orbit.Integracao` + `IntegracaoPainel`; `/ws/rede`; `painel/rede.html`; seed `-demo` | Um lote enviado por `curl` aparece no mapa em < 5 s; reenviar o mesmo lote não duplica; uma leitura antiga não move o Orbit; testes obrigatórios verdes |
+| 1 | **Contas abertas** | Migração `0004_contas_abertas.sql`, cadastro, login por e-mail ou login, recuperação de senha com Mailpit, consentimentos, exclusão de conta, JWT com `empresa_id` opcional; telas simples de cadastro e recuperação no app | Criar conta pelo app, sair, recuperar a senha pelo Mailpit e entrar de novo; contas antigas de empresa continuam entrando; `go test` verde |
+| 2 | **Rede Orbit, backend e painel** | Migração `0005_rede_orbit.sql` (`orbit`, `leitura_orbit`, `ponto_fixo`, `contribuicao_diaria`); `POST /leituras`, `/ponto/sinal`, `/me/contribuicao`; `orbit.Integracao` + `IntegracaoPainel`; `/ws/rede`; `painel/rede.html`; seed `-demo` | Um lote enviado por `curl` aparece no mapa em < 5 s; reenviar o mesmo lote não duplica; uma leitura antiga não move o Orbit; testes obrigatórios verdes |
 | 3 | **Ponto de transmissão e Orbit virtual no app** | `orbit_sinal.dart`, `LeitorOrbit` (busca no foreground service), `DeduplicadorLeituras`, `fila_leituras`, bip, modo Orbit virtual (`admin_ktm`/`demo`), permissões BLE em Android/iOS, modo leitura do `LocalizacaoService` para quem não tem empresa | **Roteiro do quickstart, passos 3 a 6, em aparelhos reais**; `flutter test` verde |
 | 4 | **Protótipo de UX** | Protótipo navegável das telas: apresentação inicial, permissões, 4 abas, canal ativo, criar canal, convite, contribuição, perfil | Aprovação explícita do usuário |
 | 5 | **Nova navegação e experiência** | `go_router`, `NavigationBar` em 4 abas, apresentação inicial, tela de permissões, novo canal ativo, tema claro e escuro, fontes do sistema | Teste com 3 pessoas que nunca usaram o app (SC-004/SC-005) |
-| 6 | **Canais da comunidade** | Migração 0004 (parte de canais), `PodeEntrar`, explorar (busca e próximos), convite por código e QR com deep link, favoritos, banir, apagar canal | Criar canal privado, entrar por QR em < 1 min (SC-006); testes de `PodeEntrar` verdes |
+| 6 | **Canais da comunidade** | Migração `0006_canais_comunidade.sql`, `PodeEntrar`, explorar (busca e próximos), convite por código e QR com deep link, favoritos, banir, apagar canal | Criar canal privado, entrar por QR em < 1 min (SC-006); testes de `PodeEntrar` verdes |
 | 7 | **Contribuição e privacidade** | Aba Contribuição, textos de termos e privacidade, revogar consentimento, auditoria do Princípio VII (app e painel) | Checklist SC-008 conferido tela a tela |
 | 8 | **Preparação da demo** | Seed final, roteiro ensaiado, vídeo de plano B, medição de bateria (SC-007) | Roteiro completo executado sem falhas 2 vezes seguidas |
 
@@ -113,7 +113,9 @@ Só o que é novo ou alterado. O resto segue a estrutura da 001.
 
 ```text
 backend/
-├── migrations/0004_rede_orbit.sql          # novo
+├── migrations/0004_contas_abertas.sql       # novo (Etapa 1)
+├── migrations/0005_rede_orbit.sql          # novo (Etapa 2)
+├── migrations/0006_canais_comunidade.sql   # novo (Etapa 6)
 ├── cmd/seed/main.go                         # + flag -demo
 ├── internal/
 │   ├── auth/                                # empresa_id opcional, novos papéis
