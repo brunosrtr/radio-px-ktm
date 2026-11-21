@@ -190,6 +190,12 @@ func (s *Servico) DefinirPreferencia(ctx context.Context, usuarioID, canalID str
 // conhecida do motorista está dentro do raio (FR-014/FR-015) — usado pelo
 // handler WebSocket em entrar_canal.
 func (s *Servico) ObterParaEntrada(ctx context.Context, canalID, empresaID, usuarioID string) (*CanalDB, error) {
+	// Usuário sem empresa (conta do público) nunca entra em canal de empresa;
+	// canais da comunidade chegam na Etapa 6 da 003-rede-orbit.
+	if empresaID == "" {
+		return nil, ErrSemPermissao
+	}
+
 	c, err := s.repositorio.ObterCanal(ctx, canalID)
 	if err != nil {
 		return nil, err
@@ -225,6 +231,10 @@ func (s *Servico) ObterParaEntrada(ctx context.Context, canalID, empresaID, usua
 // ativa fora do alcance da última posição conhecida do motorista (FR-014,
 // FR-015, FR-029).
 func (s *Servico) ListarParaMotorista(ctx context.Context, empresaID, usuarioID string) ([]CanalListado, error) {
+	if empresaID == "" {
+		return []CanalListado{}, nil
+	}
+
 	canais, err := s.repositorio.ListarAutorizados(ctx, empresaID)
 	if err != nil {
 		return nil, err

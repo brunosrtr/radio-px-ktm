@@ -26,8 +26,23 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: ${BACKEND_PORT}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORTA: ${SMTP_PORTA:-1025}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_SENHA: ${SMTP_SENHA:-}
+      SMTP_REMETENTE: ${SMTP_REMETENTE:-nao-responda@radiopx.local}
     ports:
       - "${BACKEND_PORT}:8080"
+
+  # Caixa de e-mail local para a recuperação de senha (FR-025): os e-mails
+  # enviados pelo backend aparecem em http://localhost:8025, nunca saem da
+  # máquina.
+  mailpit:
+    image: axllent/mailpit:v1.27.0
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
 volumes:
   postgres_data:

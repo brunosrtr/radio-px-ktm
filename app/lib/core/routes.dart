@@ -8,4 +8,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String canais = '/canais';
   static const String sobre = '/sobre';
+  static const String cadastro = '/cadastro';
+  static const String recuperarSenha = '/recuperar-senha';
+  static const String conta = '/conta';
 }

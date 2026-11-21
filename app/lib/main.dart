@@ -5,9 +5,12 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'core/routes.dart';
 import 'core/rede_local.dart';
 import 'core/theme.dart';
+import 'features/auth/cadastro_page.dart';
 import 'features/auth/login_page.dart';
+import 'features/auth/recuperar_senha_page.dart';
 import 'features/auth/sobre_page.dart';
 import 'features/canais/lista_canais_page.dart';
+import 'features/configuracoes/conta_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +33,9 @@ class RadioPxApp extends StatelessWidget {
         AppRoutes.login: (_) => const LoginPage(),
         AppRoutes.sobre: (_) => const SobrePage(),
         AppRoutes.canais: (_) => const ListaCanaisPage(),
+        AppRoutes.cadastro: (_) => const CadastroPage(),
+        AppRoutes.recuperarSenha: (_) => const RecuperarSenhaPage(),
+        AppRoutes.conta: (_) => const ContaPage(),
       },
     );
   }

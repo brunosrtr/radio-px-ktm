@@ -67,7 +67,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s := &sessao{handler: h, conn: conn, usuarioID: claims.UsuarioID, empresaID: claims.EmpresaID, nome: u.Nome}
+	s := &sessao{handler: h, conn: conn, usuarioID: claims.UsuarioID, empresaID: claims.EmpresaID, nome: u.NomeNoRadio()}
 	defer s.encerrar()
 
 	for {

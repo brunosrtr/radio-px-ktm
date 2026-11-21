@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../core/theme.dart';
+import '../../core/token_storage.dart';
 import '../../services/audio_service.dart';
 import '../../services/background_service.dart';
 import '../../services/canal_service.dart';
@@ -105,7 +106,7 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       _canalService.entrarCanal(widget.canalId);
       await BackgroundService.iniciar();
       if (_encerrando) return;
-      await _localizacaoService.iniciar();
+      await _iniciarHistoricoDePosicoes();
       _servicosIniciados = true;
     } on FalhaAudio catch (erro) {
       _falharAudio(erro);
@@ -176,7 +177,7 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       if (!_servicosIniciados) {
         await BackgroundService.iniciar();
         if (_encerrando) return;
-        await _localizacaoService.iniciar();
+        await _iniciarHistoricoDePosicoes();
         _servicosIniciados = true;
       }
     } on FalhaAudio catch (erro) {
@@ -331,6 +332,14 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     final a = partes.isNotEmpty && partes[0].isNotEmpty ? partes[0][0] : '';
     final b = partes.length > 1 && partes[1].isNotEmpty ? partes[1][0] : '';
     return (a + b).toUpperCase();
+  }
+
+  /// O trajeto só é registrado para contas vinculadas a uma empresa (FR-034
+  /// da 003-rede-orbit); contas do público não enviam histórico.
+  Future<void> _iniciarHistoricoDePosicoes() async {
+    if (TokenStorage.instance.usuario?.temEmpresa ?? false) {
+      await _localizacaoService.iniciar();
+    }
   }
 
   @override

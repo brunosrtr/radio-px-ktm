@@ -22,17 +22,30 @@ type Papel string
 const (
 	PapelAdmin     Papel = "admin"
 	PapelMotorista Papel = "motorista"
+	// PapelUsuario é a conta do público, sem empresa (FR-023).
+	PapelUsuario Papel = "usuario"
+	// PapelAdminKTM acessa o painel Rede Orbit e o modo Orbit virtual.
+	PapelAdminKTM Papel = "admin_ktm"
+	// PapelDemo acessa só o modo Orbit virtual (demonstração).
+	PapelDemo      Papel = "demo"
 	expiracaoToken       = 24 * time.Hour
 )
 
 // Claims são os dados carregados pelo JWT emitido no login (RF21, RNF11,
 // RNF12): usuário, empresa e papel, suficientes para autorizar sem round-trip
-// ao banco.
+// ao banco. EmpresaID é "" para contas sem vínculo com empresa (FR-033).
 type Claims struct {
 	UsuarioID string `json:"usuario_id"`
 	EmpresaID string `json:"empresa_id"`
 	Papel     Papel  `json:"papel"`
 	jwt.RegisteredClaims
+}
+
+// TemEmpresa informa se o token pertence a um usuário vinculado a uma
+// empresa. Toda autorização por empresa deve passar por aqui antes de
+// comparar IDs, para que "" nunca seja tratado como uma empresa.
+func (c *Claims) TemEmpresa() bool {
+	return c.EmpresaID != ""
 }
 
 // HashSenha calcula o hash bcrypt de uma senha em texto plano.

@@ -24,114 +24,114 @@
 
 ### Configuração
 
-- [ ] T001 [P] Adicionar o serviço `mailpit` (SMTP 1025, web 8025) em `docker-compose.yml` e passar `SMTP_*` para o serviço `backend`
-- [ ] T002 [P] Adicionar `SMTP_HOST`, `SMTP_PORTA`, `SMTP_USUARIO`, `SMTP_SENHA`, `SMTP_REMETENTE` em `.env.example`, comentadas e com valores do Mailpit
-- [ ] T003 Ler `SMTP_*` (opcionais) em `backend/internal/config/config.go`; `Config.SMTPConfigurado()` retorna se o host está definido
+- [X] T001 [P] Adicionar o serviço `mailpit` (SMTP 1025, web 8025) em `docker-compose.yml` e passar `SMTP_*` para o serviço `backend`
+- [X] T002 [P] Adicionar `SMTP_HOST`, `SMTP_PORTA`, `SMTP_USUARIO`, `SMTP_SENHA`, `SMTP_REMETENTE` em `.env.example`, comentadas e com valores do Mailpit
+- [X] T003 Ler `SMTP_*` (opcionais) em `backend/internal/config/config.go`; `Config.SMTPConfigurado()` retorna se o host está definido
 
 ### Base de dados e autorização (bloqueia o resto da etapa)
 
-- [ ] T004 Criar `backend/migrations/0004_contas_abertas.sql` conforme [data-model.md §1](./data-model.md):
+- [X] T004 Criar `backend/migrations/0004_contas_abertas.sql` conforme [data-model.md §1](./data-model.md):
   - extensão `citext`;
   - em `usuario`: `email`, `apelido` e `excluido_em` novos, `empresa_id`/`login` aceitando nulo, check de `papel` ampliado, checks de coerência papel↔empresa e email/login;
   - preenchimento de `apelido` nas contas existentes;
   - tabelas `recuperacao_senha` e `consentimento`;
   - tudo idempotente: `if not exists` e blocos `do $$` para as constraints
-- [ ] T005 Atualizar `backend/internal/usuario/usuario.go`:
+- [X] T005 Atualizar `backend/internal/usuario/usuario.go`:
   - campos `Email`, `Apelido`, `ExcluidoEm`;
   - `empresa_id` e `login` lidos com `coalesce(...::text, '')`, para que `""` signifique "sem vínculo" sem mudar o tipo `string` usado nos outros pacotes;
   - `Criar` grava com `nullif($n, '')::uuid`;
   - novas constantes `PapelUsuario`, `PapelAdminKTM`, `PapelDemo`
-- [ ] T006 Adicionar `BuscarPorIdentificador` em `backend/internal/usuario/usuario.go` (e-mail sem diferenciar maiúsculas de minúsculas **ou** login; só contas ativas e não excluídas)
-- [ ] T007 Garantir que empresa vazia nunca autoriza canal de empresa:
+- [X] T006 Adicionar `BuscarPorIdentificador` em `backend/internal/usuario/usuario.go` (e-mail sem diferenciar maiúsculas de minúsculas **ou** login; só contas ativas e não excluídas)
+- [X] T007 Garantir que empresa vazia nunca autoriza canal de empresa:
   - em `backend/internal/canal/service.go` (`ObterParaEntrada`, `ListarParaMotorista`) e `backend/internal/ws/central_handler.go`, retornar `ErrSemPermissao` / lista vazia quando `empresaID == ""`;
   - acrescentar o método `TemEmpresa()` às `Claims` em `backend/internal/auth/auth.go`
-- [ ] T008 🔒 Teste em `backend/internal/canal/service_test.go`: um usuário sem empresa não lista nem entra em canal privado ou compartilhado de empresa
-- [ ] T009 Recusar `POST /posicoes` de usuário sem empresa com `403 sem_historico` (FR-034) em `backend/internal/transporte/posicoes_handler.go`, com teste em `backend/internal/transporte/posicoes_handler_test.go`
+- [X] T008 🔒 Teste em `backend/internal/canal/service_test.go`: um usuário sem empresa não lista nem entra em canal privado ou compartilhado de empresa
+- [X] T009 Recusar `POST /posicoes` de usuário sem empresa com `403 sem_historico` (FR-034) em `backend/internal/transporte/posicoes_handler.go`, com teste em `backend/internal/transporte/posicoes_handler_test.go`
 
 ### Backend: cadastro, recuperação, consentimento e exclusão
 
-- [ ] T010 [P] [US4] Criar o pacote `backend/internal/email/` (`email.go`):
+- [X] T010 [P] [US4] Criar o pacote `backend/internal/email/` (`email.go`):
   - interface `Enviador` com `Enviar(ctx, para, assunto, corpo)`;
   - `EnviadorSMTP` (`net/smtp`);
   - `EnviadorMemoria` para testes;
   - sem SMTP configurado, `NovoEnviador` retorna `nil`
-- [ ] T011 [P] [US4] Criar `backend/internal/usuario/cadastro_publico.go`:
+- [X] T011 [P] [US4] Criar `backend/internal/usuario/cadastro_publico.go`:
   - `DadosCadastroPublico`, `ValidarCadastroPublico` (nome obrigatório, apelido 2–24, e-mail válido normalizado, senha ≥ 8, versão de termos obrigatória) e `CriarUsuarioPublico` (papel `usuario`, sem empresa);
   - na mesma transação, grava o consentimento `termos`;
   - `ErrEmailEmUso` vem da violação de unicidade
-- [ ] T012 [P] [US4] Criar `backend/internal/usuario/consentimento.go` com `RegistrarConsentimento`, `RevogarConsentimento` e `ConsentimentosVigentes` (tipos `termos` e `ponto_transmissao`)
-- [ ] T013 [P] [US4] Criar `backend/internal/usuario/recuperacao.go`:
+- [X] T012 [P] [US4] Criar `backend/internal/usuario/consentimento.go` com `RegistrarConsentimento`, `RevogarConsentimento` e `ConsentimentosVigentes` (tipos `termos` e `ponto_transmissao`)
+- [X] T013 [P] [US4] Criar `backend/internal/usuario/recuperacao.go`:
   - `SolicitarRecuperacao`: código de 6 dígitos via `crypto/rand`, hash bcrypt, validade de 15 min; invalida os códigos anteriores do usuário; envia pelo `email.Enviador`; para e-mail inexistente, não faz nada e não dá erro;
   - `RedefinirSenha`: no máximo 5 tentativas, uso único, troca o `senha_hash`
-- [ ] T014 [P] [US4] Criar `backend/internal/usuario/exclusao.go` com `ExcluirConta`. Numa transação:
+- [X] T014 [P] [US4] Criar `backend/internal/usuario/exclusao.go` com `ExcluirConta`. Numa transação:
   - anonimiza `nome`, `apelido`, `email`, `login`, `cpf`;
   - `ativo = false` e `excluido_em = now()`;
   - apaga `posicao_atual`, `dispositivo`, `preferencia_canal` e `recuperacao_senha`;
   - encerra as participações abertas com motivo `desconexao`
-- [ ] T015 [P] [US4] Criar o limitador em memória `backend/internal/transporte/limitador.go` (janela deslizante por IP, configurável; padrão de 5 a cada 10 min), sem dependência externa (Princípio VI)
-- [ ] T016 [US4] Estender `backend/internal/transporte/auth_handler.go` conforme [contracts/rest-api.md](./contracts/rest-api.md):
+- [X] T015 [P] [US4] Criar o limitador em memória `backend/internal/transporte/limitador.go` (janela deslizante por IP, configurável; padrão de 5 a cada 10 min), sem dependência externa (Princípio VI)
+- [X] T016 [US4] Estender `backend/internal/transporte/auth_handler.go` conforme [contracts/rest-api.md](./contracts/rest-api.md):
   - `Cadastro`;
   - `Login`, que aceita `identificador`, ou `login` por compatibilidade com o app atual, e devolve `apelido`;
   - `RecuperarSenha`: `202` sempre, `503` sem SMTP;
   - `RedefinirSenha`;
   - `Me`, com `apelido`, `email`, `empresa_id` nulo quando não há empresa, e consentimentos;
   - `AtualizarMe`, `ExcluirMe` e `DefinirConsentimento`
-- [ ] T017 [P] [US4] Criar `backend/painel/termos.html` e `backend/painel/privacidade.html` (versão `2026-11`), textos simples que citam o Princípio VII, servidos publicamente
-- [ ] T018 [US4] Registrar em `backend/internal/transporte/router.go`:
+- [X] T017 [P] [US4] Criar `backend/painel/termos.html` e `backend/painel/privacidade.html` (versão `2026-11`), textos simples que citam o Princípio VII, servidos publicamente
+- [X] T018 [US4] Registrar em `backend/internal/transporte/router.go`:
   - rotas públicas `POST /auth/cadastro`, `/auth/recuperar-senha` e `/auth/redefinir-senha`, as duas primeiras com o limitador;
   - `GET /termos` e `/privacidade`;
   - rotas autenticadas `PATCH /me`, `DELETE /me` e `PUT /me/consentimentos/{tipo}`;
   - ligar o `email.Enviador` em `backend/cmd/api/main.go`
-- [ ] T019 [US4] Usar o apelido como nome de quem fala no rádio (FR-027): em `backend/internal/ws/handler.go`, `nome: u.Apelido`, com `u.Nome` como reserva se o apelido estiver vazio
+- [X] T019 [US4] Usar o apelido como nome de quem fala no rádio (FR-027): em `backend/internal/ws/handler.go`, `nome: u.Apelido`, com `u.Nome` como reserva se o apelido estiver vazio
 
 ### Backend: testes
 
-- [ ] T020 [P] [US4] `backend/internal/usuario/cadastro_publico_test.go`:
+- [X] T020 [P] [US4] `backend/internal/usuario/cadastro_publico_test.go`:
   - casos de validação;
   - e-mail duplicado sem diferenciar maiúsculas (`Maria@x.com` × `maria@x.com`) → `ErrEmailEmUso`;
   - consentimento `termos` gravado;
   - conta de empresa antiga continua sendo encontrada por `BuscarPorIdentificador` pelo login
-- [ ] T021 [P] [US4] `backend/internal/usuario/recuperacao_test.go`:
+- [X] T021 [P] [US4] `backend/internal/usuario/recuperacao_test.go`:
   - código certo troca a senha;
   - código expirado, já usado ou na 6ª tentativa é recusado;
   - um novo pedido invalida o código anterior;
   - e-mail inexistente não envia nada (verificado com `EnviadorMemoria`)
-- [ ] T022 [P] [US4] `backend/internal/usuario/exclusao_test.go`: depois de excluir, o login pelo e-mail antigo falha, os dados pessoais estão anonimizados e o mesmo e-mail pode criar uma conta nova
-- [ ] T023 [P] [US4] `backend/internal/transporte/auth_handler_test.go`, testes de contrato:
+- [X] T022 [P] [US4] `backend/internal/usuario/exclusao_test.go`: depois de excluir, o login pelo e-mail antigo falha, os dados pessoais estão anonimizados e o mesmo e-mail pode criar uma conta nova
+- [X] T023 [P] [US4] `backend/internal/transporte/auth_handler_test.go`, testes de contrato:
   - `201`/`409`/`422`/`429` no cadastro;
   - login por e-mail e por login;
   - corpo antigo `{"login": ...}` ainda aceito;
   - `202` na recuperação para e-mail inexistente;
   - `401` em `DELETE /me` sem token
-- [ ] T024 [P] [US4] `backend/internal/transporte/limitador_test.go`: a 6ª tentativa na janela é recusada e libera depois que a janela passa (com relógio injetável)
+- [X] T024 [P] [US4] `backend/internal/transporte/limitador_test.go`: a 6ª tentativa na janela é recusada e libera depois que a janela passa (com relógio injetável)
 
 ### App
 
-- [ ] T025 [US4] Estender `app/lib/features/auth/auth_service.dart`:
+- [X] T025 [US4] Estender `app/lib/features/auth/auth_service.dart`:
   - `login(identificador, senha)`;
   - `cadastrar(...)`;
   - `solicitarRecuperacao(email)` e `redefinirSenha(email, codigo, novaSenha)`;
   - `excluirConta()`;
   - `me()`, que devolve um `UsuarioSessao` com `apelido`, `papel`, `temEmpresa`, em `app/lib/models/usuario_sessao.dart`
-- [ ] T026 [P] [US4] Criar `app/lib/features/auth/cadastro_page.dart`:
+- [X] T026 [P] [US4] Criar `app/lib/features/auth/cadastro_page.dart`:
   - campos nome, apelido de rádio, e-mail, senha e confirmação;
   - caixa "Li e aceito os termos de uso e a política de privacidade", com links para `/termos` e `/privacidade`;
   - validação na própria tela e mensagens para `email_em_uso`, `muitas_tentativas` e `dados_invalidos`;
   - identidade visual atual (`core/theme.dart`)
-- [ ] T027 [P] [US4] Criar `app/lib/features/auth/recuperar_senha_page.dart` em dois passos: informar o e-mail, depois código + nova senha. Mostra a mensagem neutra "se o e-mail tiver conta, enviamos um código"
-- [ ] T028 [US4] Ajustar `app/lib/features/auth/login_page.dart`:
+- [X] T027 [P] [US4] Criar `app/lib/features/auth/recuperar_senha_page.dart` em dois passos: informar o e-mail, depois código + nova senha. Mostra a mensagem neutra "se o e-mail tiver conta, enviamos um código"
+- [X] T028 [US4] Ajustar `app/lib/features/auth/login_page.dart`:
   - campo "E-mail ou login";
   - botões "Criar conta" e "Esqueci minha senha";
   - trocar o comentário e textos que dizem que as contas são fornecidas pela empresa
-- [ ] T029 [US4] Registrar as rotas `cadastro` e `recuperarSenha` em `app/lib/core/routes.dart` e `app/lib/main.dart`. O `go_router` só entra na Etapa 5
-- [ ] T030 [US4] Não iniciar o histórico de posições para quem não tem empresa (FR-034): em `app/lib/features/canais/canal_ativo_page.dart`, chamar `_localizacaoService.iniciar()` só quando `UsuarioSessao.temEmpresa`. O modo leitura completo fica para a Etapa 3
-- [ ] T031 [P] [US4] Criar a tela provisória `app/lib/features/configuracoes/conta_page.dart` com apelido, e-mail, "Sair" e "Excluir conta" (com confirmação), acessível pelo menu da lista de canais. Ela vira a aba Perfil na Etapa 5
-- [ ] T032 [P] [US4] `app/test/auth_service_test.dart`: `ApiClient` simulado; cadastro envia os campos do contrato, guarda o token e mapeia `409` para `EmailEmUsoException`; login envia `identificador`
-- [ ] T033 [P] [US4] `app/test/cadastro_page_test.dart` (widget): botão desabilitado sem aceite dos termos; senhas diferentes mostram erro; apelido com 1 caractere mostra erro
+- [X] T029 [US4] Registrar as rotas `cadastro` e `recuperarSenha` em `app/lib/core/routes.dart` e `app/lib/main.dart`. O `go_router` só entra na Etapa 5
+- [X] T030 [US4] Não iniciar o histórico de posições para quem não tem empresa (FR-034): em `app/lib/features/canais/canal_ativo_page.dart`, chamar `_localizacaoService.iniciar()` só quando `UsuarioSessao.temEmpresa`. O modo leitura completo fica para a Etapa 3
+- [X] T031 [P] [US4] Criar a tela provisória `app/lib/features/configuracoes/conta_page.dart` com apelido, e-mail, "Sair" e "Excluir conta" (com confirmação), acessível pelo menu da lista de canais. Ela vira a aba Perfil na Etapa 5
+- [X] T032 [P] [US4] `app/test/auth_service_test.dart`: `ApiClient` simulado; cadastro envia os campos do contrato, guarda o token e mapeia `409` para `EmailEmUsoException`; login envia `identificador`
+- [X] T033 [P] [US4] `app/test/cadastro_page_test.dart` (widget): botão desabilitado sem aceite dos termos; senhas diferentes mostram erro; apelido com 1 caractere mostra erro
 
 ### Fechamento da etapa
 
-- [ ] T034 Atualizar o seed `backend/cmd/seed/main.go` para preencher `apelido` nas contas de exemplo
+- [X] T034 Atualizar o seed `backend/cmd/seed/main.go` para preencher `apelido` nas contas de exemplo
 - [ ] T035 Rodar `cd backend && go test ./...`, `cd app && flutter analyze && flutter test`, e o critério de aceite em um celular real com o Mailpit
 
 **Checkpoint**: parar e pedir o aceite do usuário (Princípio II).

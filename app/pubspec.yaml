@@ -47,6 +47,7 @@ dependencies:
   opus_flutter_new: ^3.0.7
   nsd: ^5.0.1
   mobile_scanner: ^7.4.2
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

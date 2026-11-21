@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/http_client.dart';
+import '../../core/routes.dart';
 import '../../core/theme.dart';
+import '../../core/token_storage.dart';
 import 'canal_ativo_page.dart';
 import '../../services/localizacao_service.dart';
 
@@ -24,6 +26,11 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
   String? _erro;
   List<Map<String, dynamic>> _canais = [];
 
+  /// Contas do público não enviam posição para o histórico (FR-034); a
+  /// atualização de posição para canais com geocerca só vale para quem tem
+  /// empresa até a Etapa 3 da 003-rede-orbit.
+  bool get _temEmpresa => TokenStorage.instance.usuario?.temEmpresa ?? false;
+
   @override
   void initState() {
     super.initState();
@@ -38,7 +45,7 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
     try {
       _avisoLocalizacao = null;
       try {
-        await _localizacao.atualizarPosicaoParaEntrada();
+        if (_temEmpresa) await _localizacao.atualizarPosicaoParaEntrada();
       } catch (erro) {
         _avisoLocalizacao = erro is FormatException ? erro.message : 'Não foi possível atualizar o GPS. Canais com área limitada podem não aparecer.';
       }
@@ -115,6 +122,11 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
         title: const Text('Canais'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _carregar),
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'Minha conta',
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.conta),
+          ),
         ],
       ),
       body: Column(
@@ -138,7 +150,17 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
       return Center(child: Text(_erro!));
     }
     if (_canais.isEmpty) {
-      return const Center(child: Text('Nenhum canal disponível.'));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _temEmpresa
+                ? 'Nenhum canal disponível.'
+                : 'Ainda não há canais para você. Em breve você poderá criar canais e encontrar os da comunidade.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
 
     return RefreshIndicator(

@@ -16,11 +16,11 @@ import (
 )
 
 var contas = []struct {
-	nome, login, senha, papel string
+	nome, apelido, login, senha, papel string
 }{
-	{"Admin Teste", "admin", "admin123", usuario.PapelAdmin},
-	{"Motorista Um", "motorista1", "motorista123", usuario.PapelMotorista},
-	{"Motorista Dois", "motorista2", "motorista123", usuario.PapelMotorista},
+	{"Admin Teste", "Admin", "admin", "admin123", usuario.PapelAdmin},
+	{"Motorista Um", "Motorista Um", "motorista1", "motorista123", usuario.PapelMotorista},
+	{"Motorista Dois", "Motorista Dois", "motorista2", "motorista123", usuario.PapelMotorista},
 }
 
 func main() {
@@ -59,6 +59,7 @@ func main() {
 		u, err := usuarios.Criar(ctx, usuario.Usuario{
 			EmpresaID: e.ID,
 			Nome:      c.nome,
+			Apelido:   c.apelido,
 			Login:     c.login,
 			SenhaHash: hash,
 			Papel:     c.papel,

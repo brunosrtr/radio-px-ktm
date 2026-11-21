@@ -39,6 +39,12 @@ func (h *PosicoesHandler) Receber(w http.ResponseWriter, r *http.Request) {
 		responderErro(w, http.StatusUnauthorized, "token_invalido", "token ausente ou inválido")
 		return
 	}
+	// O trajeto só é registrado para quem tem vínculo com empresa (FR-034 da
+	// 003-rede-orbit); contas do público não têm histórico de posições.
+	if !claims.TemEmpresa() {
+		responderErro(w, http.StatusForbidden, "sem_historico", "o histórico de posições é registrado apenas para contas vinculadas a uma empresa")
+		return
+	}
 
 	var corpo struct {
 		Pontos []corpoPonto `json:"pontos"`
