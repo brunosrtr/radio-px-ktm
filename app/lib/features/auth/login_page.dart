@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/routes.dart';
+import '../../core/sessao_app.dart';
 import '../../core/theme.dart';
 import '../../core/rede_local.dart';
 import 'auth_service.dart';
@@ -40,7 +41,8 @@ class _LoginPageState extends State<LoginPage> {
         _senhaController.text,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.canais);
+      SessaoApp.instance.entrou();
+      context.go('/canais');
     } on ErroConta catch (e) {
       if (!mounted) return;
       setState(() => _erro = e.mensagem);
@@ -50,7 +52,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _recuperarSenha() async {
-    final email = await Navigator.of(context).pushNamed<String>(AppRoutes.recuperarSenha);
+    final email = await context.push<String>('/recuperar-senha');
     if (email != null && mounted) {
       _loginController.text = email;
       _senhaController.clear();
@@ -89,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       IconButton(
                         onPressed: () =>
-                            Navigator.of(context).pushNamed(AppRoutes.sobre),
+                            context.push('/sobre'),
                         tooltip: 'Sobre a KTM',
                         icon: const Icon(
                           Icons.info_outline,
@@ -271,7 +273,13 @@ class _LoginPageState extends State<LoginPage> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Entrar no Rádio PX'),
+                                        Flexible(
+                                          child: Text(
+                                            'Entrar no Rádio PX',
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
                                         Icon(
                                           Icons.arrow_forward,
                                           color: AppTheme.azulPrimario,
@@ -287,7 +295,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               onPressed: _carregando
                                   ? null
-                                  : () => Navigator.of(context).pushNamed(AppRoutes.cadastro),
+                                  : () => context.go('/cadastro'),
                               child: const Text('Criar conta grátis'),
                             ),
                           ],
@@ -299,7 +307,7 @@ class _LoginPageState extends State<LoginPage> {
                   Center(
                     child: TextButton(
                       onPressed: () =>
-                          Navigator.of(context).pushNamed(AppRoutes.sobre),
+                          context.push('/sobre'),
                       child: const Text(
                         'Conheça a KTM Indústria',
                         style: TextStyle(

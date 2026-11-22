@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/theme.dart';
 import '../../orbit/ponto_transmissao.dart';
 import '../auth/documentos_legais.dart';
 
-/// Cartão do ponto de transmissão (US1): convida a ativar, mostra o estado
-/// e as leituras da sessão — sem nenhum dado do Orbit lido (FR-011).
+/// Cartão do ponto de transmissão (US1), no âmbar da rede Orbit: convida a
+/// ativar, mostra o estado e as leituras da sessão — sem nenhum dado do
+/// Orbit lido (FR-011). Tocar leva à aba Contribuição.
 class CartaoPontoTransmissao extends StatelessWidget {
   const CartaoPontoTransmissao({super.key});
 
@@ -15,49 +18,63 @@ class CartaoPontoTransmissao extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([ponto, ponto.leituras.leiturasSessao, ponto.orbitVirtual.anunciando]),
       builder: (context, _) {
-        final tema = Theme.of(context);
         final orbitVirtual = ponto.orbitVirtual.anunciando.value;
+        final leituras = ponto.leituras.leiturasSessao.value;
         return Column(
           children: [
-            if (orbitVirtual != null) const _AvisoOrbitVirtual(),
-            Card(
-              margin: const EdgeInsets.fromLTRB(10, 10, 10, 4),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: switch (ponto.estado) {
-                  EstadoPonto.desativado => _Convite(mensagem: ponto.mensagem),
-                  EstadoPonto.iniciando => const Row(
+            if (orbitVirtual != null) ...[const _AvisoOrbitVirtual(), const SizedBox(height: 10)],
+            Material(
+              color: AppTheme.fundoOrbit(context),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: AppTheme.bordaOrbit(context)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: switch (ponto.estado) {
+                EstadoPonto.desativado => Padding(padding: const EdgeInsets.all(16), child: _Convite(mensagem: ponto.mensagem)),
+                EstadoPonto.iniciando => const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
                     children: [
-                      SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.ambar)),
                       SizedBox(width: 14),
                       Text('Ligando o ponto de transmissão…'),
                     ],
                   ),
-                  EstadoPonto.ativo => Row(
-                    children: [
-                      Icon(Icons.sensors, color: tema.colorScheme.primary, size: 30),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Ponto de transmissão ativo', style: tema.textTheme.titleMedium),
-                            Text(
-                              ponto.leituras.leiturasSessao.value == 0
-                                  ? 'Procurando caminhões com Orbit por perto.'
-                                  : 'Você ajudou a localizar ${ponto.leituras.leiturasSessao.value} '
-                                        '${ponto.leituras.leiturasSessao.value == 1 ? 'caminhão' : 'caminhões'} nesta sessão.',
-                              style: tema.textTheme.bodySmall,
-                            ),
-                          ],
+                ),
+                EstadoPonto.ativo => InkWell(
+                  onTap: () => context.go('/contribuicao'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.sensors, color: AppTheme.ambar, size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Ponto de transmissão ativo', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                              Text(
+                                leituras == 0
+                                    ? 'Procurando caminhões com Orbit por perto.'
+                                    : 'Você ajudou a localizar $leituras ${leituras == 1 ? 'caminhão' : 'caminhões'} nesta sessão.',
+                                style: TextStyle(color: AppTheme.textoOrbit(context)),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                        const Icon(Icons.chevron_right, color: AppTheme.ambar),
+                      ],
+                    ),
                   ),
-                  EstadoPonto.suspenso => Row(
+                ),
+                EstadoPonto.suspenso => Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                  child: Row(
                     children: [
-                      Icon(Icons.sensors_off, color: tema.colorScheme.error, size: 30),
-                      const SizedBox(width: 14),
+                      const Icon(Icons.sensors_off, color: AppTheme.ambar, size: 28),
+                      const SizedBox(width: 12),
                       Expanded(child: Text(ponto.mensagem ?? 'Ponto de transmissão pausado.')),
                       TextButton(
                         onPressed: () async {
@@ -74,8 +91,8 @@ class CartaoPontoTransmissao extends StatelessWidget {
                       ),
                     ],
                   ),
-                },
-              ),
+                ),
+              },
             ),
           ],
         );
@@ -97,7 +114,7 @@ class _Convite extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.sensors, color: tema.colorScheme.primary),
+            const Icon(Icons.sensors, color: AppTheme.ambar),
             const SizedBox(width: 8),
             Text('Ajude a rede Orbit', style: tema.textTheme.titleMedium),
           ],
@@ -116,6 +133,7 @@ class _Convite extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.ambar, foregroundColor: const Color(0xFF1A1205)),
             onPressed: () => confirmarPontoTransmissao(context),
             icon: const Icon(Icons.sensors),
             label: const Text('Ativar'),

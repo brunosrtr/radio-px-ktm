@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+import '../../core/http_client.dart';
 import '../../core/theme.dart';
 import '../../services/audio_service.dart';
 import '../../services/background_service.dart';
@@ -17,10 +19,14 @@ class CanalAtivoPage extends StatefulWidget {
     super.key,
     required this.canalId,
     required this.nomeCanal,
+    this.silenciadoInicial = false,
   });
 
   final String canalId;
   final String nomeCanal;
+
+  /// Se a pessoa já tinha silenciado este canal (vem da lista).
+  final bool silenciadoInicial;
 
   @override
   State<CanalAtivoPage> createState() => _CanalAtivoPageState();
@@ -46,6 +52,8 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   int _participantes = 0;
   String? _remetenteFalando;
   String? _avisoRemocao;
+  late bool _silenciado = widget.silenciadoInicial;
+  final _api = ApiClient();
 
   Timer? _timeoutConexao;
   Timer? _reconexaoTimer;
@@ -326,11 +334,18 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     unawaited(_audioService.destravarAudioNoToque().catchError(_falharAudio));
   }
 
-  String _iniciais(String nome) {
-    final partes = nome.trim().split(RegExp(r'\s+'));
-    final a = partes.isNotEmpty && partes[0].isNotEmpty ? partes[0][0] : '';
-    final b = partes.length > 1 && partes[1].isNotEmpty ? partes[1][0] : '';
-    return (a + b).toUpperCase();
+  /// Silencia ou reativa o canal sem sair dele (FR-019); o servidor para de
+  /// enviar áudio na hora.
+  Future<void> _alternarSilencio() async {
+    final novo = !_silenciado;
+    setState(() => _silenciado = novo);
+    try {
+      await _api.dio.put('/canais/${widget.canalId}/preferencia', data: {'silenciado': novo});
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _silenciado = !novo);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível mudar o som do canal.')));
+    }
   }
 
   /// Contas com empresa enviam o trajeto; as do público só a posição atual,
@@ -350,120 +365,191 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.redAccent,
-                        size: 40,
-                      ),
+                      Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error, size: 44),
                       const SizedBox(height: 12),
-                      Text(_avisoRemocao!, textAlign: TextAlign.center),
+                      Text(_avisoRemocao!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 20),
-                      FilledButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Voltar'),
-                      ),
+                      FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Voltar')),
                     ],
                   ),
                 )
               : const Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Entrando no canal…'),
-                  ],
+                  children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Entrando no canal…')],
                 ),
         ),
       );
     }
 
+    final tema = Theme.of(context);
     final podeFalar = _conectado && !_filaCheia && !_ptt.ocupado;
-    final falando = _remetenteFalando != null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.nomeCanal),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(20),
+      body: SafeArea(
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => _destravarAudioSeNecessario(),
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '$_participantes participante(s) · fila $_tamanhoFila/10',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            padding: const EdgeInsets.fromLTRB(8, 8, 16, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Voltar aos canais',
+                      iconSize: 28,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.nomeCanal,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tema.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            '$_participantes no canal${_silenciado ? ' · silenciado' : ''}',
+                            style: tema.textTheme.bodyMedium?.copyWith(color: tema.colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (!_audioDestravado)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 8),
+                    child: MaterialBanner(
+                      content: const Text('Toque em qualquer lugar da tela para ativar o áudio'),
+                      actions: [TextButton(onPressed: _destravarAudioSeNecessario, child: const Text('Ativar'))],
+                    ),
+                  ),
+                if (_avisoRemocao != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 8),
+                    child: MaterialBanner(
+                      content: Text(_avisoRemocao!),
+                      actions: [TextButton(onPressed: () => setState(() => _avisoRemocao = null), child: const Text('OK'))],
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Padding(padding: const EdgeInsets.only(left: 8), child: _painelEstado(tema)),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, limites) {
+                      // Botão grande para quem dirige: ~40% da altura útil,
+                      // limitado pela largura (US6).
+                      final tamanho = math.max(120.0, math.min(300.0, math.min(limites.maxHeight * 0.78, limites.maxWidth * 0.78)));
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _botaoFalar(podeFalar, tamanho),
+                          const SizedBox(height: 12),
+                          Text(
+                            _gravando
+                                ? 'Solte para enviar'
+                                : _aguardandoSlot
+                                ? 'Aguardando sua vez na fila…'
+                                : podeFalar
+                                ? 'Segure para falar, solte para enviar'
+                                : _filaCheia
+                                ? 'Fila cheia — aguarde para falar'
+                                : 'Aguarde',
+                            style: tema.textTheme.bodyLarge?.copyWith(color: tema.colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(60)),
+                          onPressed: _alternarSilencio,
+                          icon: Icon(_silenciado ? Icons.volume_up : Icons.volume_off),
+                          label: Text(_silenciado ? 'Ativar som' : 'Silenciar'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(60),
+                            foregroundColor: tema.colorScheme.error,
+                            side: BorderSide(color: tema.colorScheme.error.withValues(alpha: 0.6)),
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Sair'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ),
-      body: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => _destravarAudioSeNecessario(),
+    );
+  }
+
+  /// Quem está falando (ou o estado do canal) em letra grande, mais a fila.
+  Widget _painelEstado(ThemeData tema) {
+    final Widget topo;
+    if (_gravando) {
+      topo = _linhaEstado(
+        tema,
+        cor: AppTheme.vermelhoFalando,
+        icone: Icons.mic,
+        rotulo: 'TRANSMITINDO',
+        corRotulo: const Color(0xFFFF8A8A),
+        titulo: 'Você',
+      );
+    } else if (_remetenteFalando != null) {
+      final nome = _remetenteFalando!;
+      topo = _linhaEstado(
+        tema,
+        cor: AppTheme.corDoAvatar(nome),
+        texto: AppTheme.iniciais(nome),
+        rotulo: 'FALANDO AGORA',
+        corRotulo: AppTheme.verdeFalando,
+        titulo: nome,
+      );
+    } else {
+      topo = _linhaEstado(
+        tema,
+        cor: tema.colorScheme.outlineVariant,
+        icone: Icons.radio,
+        rotulo: 'CANAL EM SILÊNCIO',
+        corRotulo: tema.colorScheme.onSurfaceVariant,
+        titulo: 'Ninguém falando',
+      );
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!_audioDestravado)
-              MaterialBanner(
-                content: const Text(
-                  '🔊 Toque em qualquer lugar da tela para ativar o áudio',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: _destravarAudioSeNecessario,
-                    child: const Text('Ativar'),
-                  ),
-                ],
-              ),
-            if (_avisoRemocao != null)
-              MaterialBanner(
-                content: Text(_avisoRemocao!),
-                actions: [
-                  TextButton(
-                    onPressed: () => setState(() => _avisoRemocao = null),
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-            Expanded(
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: falando
-                      ? _bolhaFalando(_remetenteFalando!)
-                      : _filaCheia
-                      ? const _AvisoCentral(
-                          icone: Icons.hourglass_top,
-                          texto: 'Fila cheia — aguarde para falar',
-                          cor: Colors.orange,
-                        )
-                      : const _AvisoCentral(
-                          icone: Icons.radio,
-                          texto: 'Canal em silêncio',
-                          cor: Colors.white38,
-                        ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 40, top: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _botaoFalar(podeFalar),
-                  const SizedBox(height: 12),
-                  Text(
-                    _gravando
-                        ? 'Transmitindo…'
-                        : _aguardandoSlot
-                        ? 'Aguardando vez na fila…'
-                        : podeFalar
-                        ? 'Segure para falar'
-                        : 'Aguarde',
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color
-                          ?.withValues(alpha: 0.8),
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
+            AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: topo),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 10),
+            Text(
+              _tamanhoFila == 0
+                  ? 'Fila vazia'
+                  : '$_tamanhoFila ${_tamanhoFila == 1 ? 'mensagem' : 'mensagens'} na fila (máx. 10)',
+              style: tema.textTheme.bodyLarge,
             ),
           ],
         ),
@@ -471,46 +557,37 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     );
   }
 
-  Widget _bolhaFalando(String nome) {
-    return Column(
-      key: const ValueKey('falando'),
-      mainAxisSize: MainAxisSize.min,
+  Widget _linhaEstado(
+    ThemeData tema, {
+    required Color cor,
+    required String rotulo,
+    required Color corRotulo,
+    required String titulo,
+    IconData? icone,
+    String? texto,
+  }) {
+    return Row(
+      key: ValueKey(rotulo + titulo),
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-          decoration: BoxDecoration(
-            color: AppTheme.azulSecundario.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.azulSecundario, width: 1.4),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        CircleAvatar(
+          radius: 28,
+          backgroundColor: cor,
+          child: icone != null
+              ? Icon(icone, color: Colors.white)
+              : Text(texto ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 20)),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppTheme.corDoAvatar(nome),
-                child: Text(
-                  _iniciais(nome),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+              Text(rotulo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: corRotulo)),
+              Text(
+                titulo,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: tema.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    nome,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const Text('falando agora', style: TextStyle(fontSize: 12)),
-                ],
-              ),
-              const SizedBox(width: 10),
-              const Icon(Icons.volume_up, color: AppTheme.azulSecundario),
             ],
           ),
         ),
@@ -518,76 +595,49 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     );
   }
 
-  Widget _botaoFalar(bool podeFalar) {
-    final cor = !podeFalar && !_gravando
-        ? Colors.grey
-        : (_gravando ? Colors.redAccent : AppTheme.azulSecundario);
+  Widget _botaoFalar(bool podeFalar, double tamanho) {
+    final cor = _gravando
+        ? AppTheme.vermelhoFalando
+        : podeFalar
+        ? AppTheme.azulSecundario
+        : Colors.grey.shade700;
+    final anel = _gravando ? const Color(0xFFFF6B6B) : (podeFalar ? AppTheme.azulPrimario : Colors.grey.shade600);
 
-    return GestureDetector(
-      onTapDown: (_) => _iniciarFala(),
-      onTapUp: (_) => _pararFala(),
-      onTapCancel: _pararFala,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 1, end: _gravando ? 1.18 : 1),
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        builder: (context, escala, filho) {
-          return Stack(
-            alignment: Alignment.center,
+    return Semantics(
+      button: true,
+      label: 'Segure para falar',
+      child: GestureDetector(
+        onTapDown: (_) => _iniciarFala(),
+        onTapUp: (_) => _pararFala(),
+        onTapCancel: _pararFala,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: tamanho,
+          height: tamanho,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: cor,
+            border: Border.all(color: anel, width: 8),
+            boxShadow: _gravando
+                ? [BoxShadow(color: const Color(0xFFFF6B6B).withValues(alpha: 0.35), blurRadius: 40, spreadRadius: 6)]
+                : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (_gravando)
-                Container(
-                  width: 96 * escala,
-                  height: 96 * escala,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.redAccent.withValues(alpha: 0.25),
-                  ),
-                ),
-              filho!,
+              if (_aguardandoSlot)
+                const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))
+              else
+                Icon(Icons.mic, color: Colors.white, size: tamanho * 0.25),
+              const SizedBox(height: 8),
+              Text(
+                _gravando ? 'Falando…' : 'Falar',
+                style: TextStyle(color: Colors.white, fontSize: tamanho * 0.085, fontWeight: FontWeight.w700),
+              ),
             ],
-          );
-        },
-        child: CircleAvatar(
-          radius: 48,
-          backgroundColor: cor,
-          child: _aguardandoSlot
-              ? const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
-                  ),
-                )
-              : const Icon(Icons.mic, color: Colors.white, size: 40),
+          ),
         ),
       ),
-    );
-  }
-}
-
-class _AvisoCentral extends StatelessWidget {
-  const _AvisoCentral({
-    required this.icone,
-    required this.texto,
-    required this.cor,
-  });
-
-  final IconData icone;
-  final String texto;
-  final Color cor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: ValueKey(texto),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icone, size: 40, color: cor),
-        const SizedBox(height: 10),
-        Text(texto, style: TextStyle(color: cor)),
-      ],
     );
   }
 }

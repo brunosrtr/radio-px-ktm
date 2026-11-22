@@ -1,7 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/routes.dart';
+import '../../core/sessao_app.dart';
 import 'auth_service.dart';
 import 'documentos_legais.dart';
 import 'validacoes.dart';
@@ -54,7 +55,8 @@ class _CadastroPageState extends State<CadastroPage> {
         senha: _senha.text,
       );
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.canais, (_) => false);
+      SessaoApp.instance.entrou();
+      context.go('/canais');
     } on ErroConta catch (e) {
       if (mounted) setState(() => _erro = e.mensagem);
     } finally {
@@ -208,7 +210,7 @@ class _CadastroPageState extends State<CadastroPage> {
                       ),
                       const SizedBox(height: 12),
                       TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => context.go('/entrar'),
                         child: const Text('Já tenho conta'),
                       ),
                     ],

@@ -93,6 +93,16 @@ class AuthService {
     return usuario;
   }
 
+  /// Altera nome e/ou apelido (PATCH /me); devolve a conta atualizada.
+  Future<UsuarioSessao> atualizarPerfil({String? nome, String? apelido}) async {
+    final resposta = await _executar(
+      () => _apiClient.dio.patch('/me', data: {'nome': ?nome, 'apelido': ?apelido}),
+    );
+    final usuario = UsuarioSessao.deJson((resposta.data as Map).cast<String, dynamic>());
+    _tokenStorage.definirUsuario(usuario);
+    return usuario;
+  }
+
   /// Exclui a conta e encerra a sessão (FR-026).
   Future<void> excluirConta() async {
     await _executar(() => _apiClient.dio.delete('/me'));

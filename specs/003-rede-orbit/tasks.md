@@ -247,9 +247,37 @@
 
 **Checkpoint**: aceite em aparelhos reais (Bluetooth não funciona no simulador) e confirmação do usuário (Princípio II).
 
-## Etapa 4 — Protótipo de UX (US6) · *a detalhar*
+## Etapa 4 — Protótipo de UX (US6)
 
-## Etapa 5 — Nova navegação e experiência (US4, US6) · *a detalhar*
+**Critério de aceite**: aprovação explícita do usuário (Princípio II).
+
+- [X] T071 [US6] Protótipo navegável com 13 telas de celular (390×844), publicado como design: [Rádio PX KTM — protótipo de UX](https://claude.ai/artifact/RKYtV7SLZ8kK67ZDpZVqiX). Linhas:
+  - primeiro acesso: 3 telas de apresentação, cadastro e permissões explicadas;
+  - dia a dia: aba Canais, canal ativo, aba Explorar, criar canal e convite;
+  - contribuição e conta: aba Contribuição, aba Perfil e Orbit virtual
+- [X] T072 [US6] Aprovação do protótipo pelo usuário (aprovado em 2026-11-22, sem ajustes)
+
+## Etapa 5 — Nova navegação e experiência (US4, US6)
+
+**Objetivo**: o app segue o protótipo aprovado: apresentação inicial, permissões explicadas, 4 abas e o novo canal ativo.
+
+**Critério de aceite**: teste com 3 pessoas que nunca usaram o app (SC-004/SC-005), **pendente**; `flutter test` verde (feito, exceto o `codec_voz_test`, que já falhava sem a biblioteca Opus no Mac).
+
+**Fora desta etapa**: a aba Explorar e o "+" de criar canal mostram o estado "em breve", porque os canais da comunidade só chegam na Etapa 6.
+
+- [X] T073 [US6] Tema em `app/lib/core/theme.dart`: claro e escuro (segue o sistema, FR-039), azul para a rádio, âmbar para a rede Orbit, e temas de `NavigationBar`, cartões e botões com alvos de no mínimo 48 px
+- [X] T074 [US6] `app/lib/core/sessao_app.dart`: estado da sessão (logado, apresentação vista, permissões vistas) persistido em Hive, mais a função pura `decidirRota`, testada
+- [X] T075 [US6] `app/lib/core/router.dart`: `go_router` com `StatefulShellRoute` de 4 abas (`/canais`, `/explorar`, `/contribuicao`, `/perfil`), rotas públicas (`/boas-vindas`, `/entrar`, `/cadastro`, `/recuperar-senha`, `/sobre`), `/permissoes`, `/canal/:id` e `/orbit-virtual` em tela cheia; substitui `routes.dart`
+- [X] T076 [US4] `app/lib/features/onboarding/boas_vindas_page.dart`: 3 telas que podem ser puladas (FR-035)
+- [X] T077 [US4] `app/lib/features/onboarding/permissoes_page.dart`: microfone, localização, Bluetooth e notificações, cada uma com explicação e botão próprio (FR-036/037)
+- [X] T078 [US6] `app/lib/features/shell/casca_page.dart`: `NavigationBar` com as 4 abas (FR-038)
+- [X] T079 [US6] Aba Canais (`app/lib/features/canais/canais_page.dart`, substitui `lista_canais_page.dart`) com o cartão compacto do ponto de transmissão
+- [X] T080 [US6] Aba Explorar com o estado "em breve" (`app/lib/features/explorar/explorar_page.dart`)
+- [X] T081 [US7] Aba Contribuição (`app/lib/features/contribuicao/contribuicao_page.dart`): `GET /me/contribuicao`, liga/desliga e bip
+- [X] T082 [US6] Aba Perfil (`app/lib/features/perfil/perfil_page.dart`, substitui `conta_page.dart`): editar nome e apelido (`PATCH /me`), Orbit virtual, documentos, sair, excluir
+- [X] T083 [US6] Novo visual de `canal_ativo_page.dart`: botão de falar grande e proporcional à tela, quem fala em destaque, fila, Silenciar e Sair sempre visíveis (FR-019); lógica de voz sem mudança
+- [X] T084 Testes: `decidirRota`, apresentação → cadastro, navegação entre abas e `widget_test` atualizado; `flutter analyze`, `flutter test` e build iOS
+
 
 ## Etapa 6 — Canais da comunidade (US5) · *a detalhar*
 

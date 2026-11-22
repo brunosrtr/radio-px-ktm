@@ -1,42 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-import 'core/routes.dart';
 import 'core/rede_local.dart';
+import 'core/router.dart';
+import 'core/sessao_app.dart';
 import 'core/theme.dart';
-import 'features/auth/cadastro_page.dart';
-import 'features/auth/login_page.dart';
-import 'features/auth/recuperar_senha_page.dart';
-import 'features/auth/sobre_page.dart';
-import 'features/canais/lista_canais_page.dart';
-import 'features/configuracoes/conta_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
+  await SessaoApp.instance.carregar();
   await RedeLocal.instance.iniciar();
   runApp(const ProviderScope(child: RadioPxApp()));
 }
 
-class RadioPxApp extends StatelessWidget {
-  const RadioPxApp({super.key});
+class RadioPxApp extends StatefulWidget {
+  const RadioPxApp({super.key, this.router});
+
+  /// Permite aos testes começar em outra rota.
+  final GoRouter? router;
+
+  @override
+  State<RadioPxApp> createState() => _RadioPxAppState();
+}
+
+class _RadioPxAppState extends State<RadioPxApp> {
+  late final GoRouter _router = widget.router ?? criarRouter();
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Rádio PX Digital',
+    return MaterialApp.router(
+      title: 'Rádio PX KTM',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      initialRoute: AppRoutes.login,
-      routes: {
-        AppRoutes.login: (_) => const LoginPage(),
-        AppRoutes.sobre: (_) => const SobrePage(),
-        AppRoutes.canais: (_) => const ListaCanaisPage(),
-        AppRoutes.cadastro: (_) => const CadastroPage(),
-        AppRoutes.recuperarSenha: (_) => const RecuperarSenhaPage(),
-        AppRoutes.conta: (_) => const ContaPage(),
-      },
+      routerConfig: _router,
     );
   }
 }
