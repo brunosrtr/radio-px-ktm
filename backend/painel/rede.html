@@ -436,6 +436,10 @@
   function registrarLeitura(l) {
     leiturasSessao++;
     $('n-leituras').textContent = leiturasSessao;
+    // Leitura fora da área visível: o mapa vai até ela, para o pulso aparecer.
+    if (!mapa.getBounds().pad(-0.1).contains([l.latitude, l.longitude])) {
+      mapa.flyTo([l.latitude, l.longitude], Math.max(mapa.getZoom(), 11), { duration: 0.8 });
+    }
     pulso(l);
     const feed = $('feed');
     feed.querySelector('.vazio')?.remove();

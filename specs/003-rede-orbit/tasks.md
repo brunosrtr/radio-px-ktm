@@ -336,4 +336,12 @@
 - [X] T102 [`checklists/privacidade.md`](./checklists/privacidade.md): conferência do SC-008 e do Princípio VII tela a tela (app e painel), com a evidência de cada item e os riscos que ficam
 
 
-## Etapa 8 — Preparação da demo · *a detalhar*
+## Etapa 8 — Preparação da demo
+
+**Critério de aceite**: roteiro completo executado sem falhas 2 vezes seguidas (feito pelo usuário com os celulares).
+
+- [X] T103 Seed final (`backend/cmd/seed/demo.go`, dados em `internal/demo`): canais públicos "Rádio KTM · Demo" (sem área) e "Trecho da demo" (com área), `-centro=lat,lng` para montar os pórticos em volta do local da apresentação e a flag `-zerar`, que devolve a demo ao estado inicial (apaga as leituras dos Orbits da demo e recoloca o caminhão 1 visto há 3 h no pórtico)
+- [X] T104 Simulador de trajeto (`backend/cmd/simular/`): entra com a conta `demo` e envia leituras do caminhão andando pela BR-116, de dois pontos de transmissão. É o plano B ao vivo se o Bluetooth falhar e serve também para gravar o vídeo
+- [X] T105 [`roteiro-demo.md`](./roteiro-demo.md): checklist da véspera e do dia, roteiro com o que falar e mostrar, o que fazer se cada passo falhar, como gravar o vídeo de plano B, protocolo de medição de bateria (SC-007) e do teste com 3 pessoas (SC-004/SC-005)
+- [X] T106 Verificar a imagem Docker do backend, o seed `-demo`/`-zerar` e o simulador contra um banco limpo
+- [ ] T107 Ensaiar o roteiro 2 vezes seguidas, gravar o vídeo e medir a bateria (usuário, com celulares reais)

@@ -1,5 +1,7 @@
 # Quickstart — Rede Orbit (`003-rede-orbit`)
 
+> Para o dia da apresentação, use o roteiro completo: [roteiro-demo.md](./roteiro-demo.md).
+
 Como subir o ambiente e rodar a **demonstração do bip** para a KTM. Os passos marcados com
 _(Etapa N)_ só funcionam depois que a etapa correspondente do [plan.md](./plan.md) for concluída.
 
@@ -8,7 +10,8 @@ _(Etapa N)_ só funcionam depois que a etapa correspondente do [plan.md](./plan.
 ```bash
 cp .env.example .env          # preencher JWT_SECRET, PONTO_ID_SEGREDO e SMTP_* (Mailpit já vem configurado)
 docker compose up             # Postgres + backend + Mailpit (http://localhost:8025)
-cd backend && go run ./cmd/seed -demo   # (Etapa 2) cria admin_ktm, conta demo, 3 Orbits virtuais e 4 pontos fixos simulados
+docker compose exec backend /seed -demo -zerar -centro=<lat,lng>   # contas admin_ktm e demo, 3 Orbits virtuais, 4 pórticos simulados e 2 canais públicos
+docker compose exec backend /simular                              # plano B: leituras simuladas, sem Bluetooth
 ```
 
 ## 2. Instalar o app em três celulares

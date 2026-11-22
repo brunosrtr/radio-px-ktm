@@ -3,8 +3,9 @@
 // sem depender de telas de gestão ainda não implementadas.
 //
 // Com -demo, cria em vez disso os dados da demonstração da Rede Orbit
-// (quickstart.md da 003-rede-orbit): contas admin_ktm e demo, três Orbits
-// virtuais e quatro pontos fixos simulados. O -demo pode rodar várias vezes.
+// (roteiro-demo.md da 003-rede-orbit): contas admin_ktm e demo, três Orbits
+// virtuais, quatro pórticos simulados em volta de -centro e dois canais
+// públicos. Pode rodar várias vezes; -zerar volta a demo ao estado inicial.
 package main
 
 import (
@@ -15,6 +16,7 @@ import (
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/auth"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/config"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/demo"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/empresa"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
@@ -29,7 +31,9 @@ var contas = []struct {
 }
 
 func main() {
-	demo := flag.Bool("demo", false, "cria os dados da demonstração da Rede Orbit")
+	modoDemo := flag.Bool("demo", false, "cria os dados da demonstração da Rede Orbit")
+	centro := flag.String("centro", demo.CentroPadrao, "com -demo: lat,lng do local da apresentação (os pórticos simulados ficam em volta)")
+	zerar := flag.Bool("zerar", false, "com -demo: apaga leituras, pórticos e contadores da demo antes de semear")
 	flag.Parse()
 	ctx := context.Background()
 
@@ -48,8 +52,8 @@ func main() {
 		log.Fatalf("erro ao aplicar migrações: %v", err)
 	}
 
-	if *demo {
-		if err := semearDemo(ctx, pool); err != nil {
+	if *modoDemo {
+		if err := semearDemo(ctx, pool, *centro, *zerar); err != nil {
 			log.Fatalf("erro ao criar dados da demonstração: %v", err)
 		}
 		return
