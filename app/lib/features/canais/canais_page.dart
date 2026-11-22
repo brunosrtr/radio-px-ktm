@@ -93,8 +93,28 @@ class _CanaisPageState extends State<CanaisPage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
-              child: Text('Canais', style: tema.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
+              padding: const EdgeInsets.fromLTRB(4, 8, 0, 12),
+              child: Row(
+                children: [
+                  Expanded(child: Text('Canais', style: tema.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700))),
+                  IconButton.filled(
+                    key: const Key('botao-novo-canal'),
+                    tooltip: 'Criar canal',
+                    iconSize: 26,
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.azulSecundario,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(48, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () async {
+                      await context.push('/criar-canal');
+                      if (mounted) await _carregar();
+                    },
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
             ),
             const CartaoPontoTransmissao(),
             const SizedBox(height: 16),
@@ -145,8 +165,11 @@ class _ItemCanal extends StatelessWidget {
     final nome = canal['nome'] as String;
     final silenciado = canal['silenciado'] as bool? ?? false;
     final geocerca = canal['geocerca_ativa'] as bool? ?? false;
+    final favorito = canal['favorito'] as bool? ?? false;
+    final privado = (canal['comunidade'] as bool? ?? false) && canal['visibilidade'] == 'privado';
     final detalhes = [
       '${canal['participantes_atual']} de ${canal['limite_participantes']}',
+      if (canal['sou_criador'] == true) 'criado por você',
       if (geocerca) 'área limitada',
       if (silenciado) 'silenciado',
     ].join(' · ');
@@ -170,7 +193,25 @@ class _ItemCanal extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(nome, style: tema.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              nome,
+                              style: tema.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (privado) ...[
+                            const SizedBox(width: 6),
+                            Icon(Icons.lock_outline, size: 16, color: tema.colorScheme.onSurfaceVariant, semanticLabel: 'Privado'),
+                          ],
+                          if (favorito) ...[
+                            const SizedBox(width: 6),
+                            const Icon(Icons.star, size: 16, color: Colors.amber, semanticLabel: 'Favorito'),
+                          ],
+                        ],
+                      ),
                       const SizedBox(height: 2),
                       Text(detalhes, style: tema.textTheme.bodyMedium?.copyWith(color: tema.colorScheme.onSurfaceVariant)),
                     ],
@@ -211,7 +252,7 @@ class _Vazio extends StatelessWidget {
           Text(
             temEmpresa
                 ? 'Os canais liberados pela sua empresa aparecem aqui.'
-                : 'Em breve você poderá criar canais e encontrar os da comunidade na aba Explorar.',
+                : 'Crie um canal com o botão + ou encontre os da comunidade na aba Explorar.',
             style: tema.textTheme.bodyMedium?.copyWith(color: tema.colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),

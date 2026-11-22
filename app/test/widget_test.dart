@@ -65,15 +65,18 @@ void main() {
     SessaoApp.instance
       ..apresentacaoVista = true
       ..permissoesVistas = true;
-    await abrir(tester, inicial: '/explorar');
+    await abrir(tester, inicial: '/perfil');
 
-    expect(find.text('Em breve: canais da comunidade'), findsOneWidget);
     expect(find.byType(NavigationDestination), findsNWidgets(4));
-
-    await tester.tap(find.text('Perfil'));
-    await tester.pumpAndSettle();
     expect(find.text('Maria da Serra'), findsOneWidget);
     expect(find.text('Modo Orbit virtual'), findsNothing, reason: 'conta comum não vê o modo de demonstração');
+
+    // As outras abas buscam dados no servidor; aqui só confirmamos que um
+    // toque troca de área (FR-038).
+    await tester.tap(find.text('Contribuição'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Sua contribuição'), findsOneWidget);
 
     // Rota de entrada com sessão aberta volta para os canais.
     expect(decidirRota(destino: '/entrar', logado: true, apresentacaoVista: true, permissoesVistas: true), '/canais');

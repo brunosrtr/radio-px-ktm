@@ -39,6 +39,19 @@
 	<array>
 		<string>_radiopx._tcp</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>br.radiopx.convite</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>radiopx</string>
+			</array>
+		</dict>
+	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Perceber caminhões com o equipamento Orbit por perto e avisar a KTM, se você ativar o ponto de transmissão.</string>
 	<key>NSCameraUsageDescription</key>

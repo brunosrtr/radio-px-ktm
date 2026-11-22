@@ -160,8 +160,10 @@ func (s *sessao) entrarCanal(ctx context.Context, canalID string) {
 		switch {
 		case errors.Is(err, canal.ErrNaoEncontrado):
 			s.enviarErro(ctx, "nao_encontrado", "canal não encontrado")
+		case errors.Is(err, canal.ErrBanido):
+			s.enviarErro(ctx, "banido", "você foi removido deste canal")
 		case errors.Is(err, canal.ErrSemPermissao):
-			s.enviarErro(ctx, "sem_permissao", "empresa não autorizada a acessar este canal")
+			s.enviarErro(ctx, "sem_permissao", "você não tem acesso a este canal")
 		case errors.Is(err, canal.ErrForaDaArea):
 			s.enviarErro(ctx, "fora_da_area", "fora da área de geocerca do canal")
 		default:

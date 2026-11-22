@@ -7,6 +7,9 @@ import '../features/auth/recuperar_senha_page.dart';
 import '../features/auth/sobre_page.dart';
 import '../features/canais/canais_page.dart';
 import '../features/canais/canal_ativo_page.dart';
+import '../features/canais/convite_page.dart';
+import '../features/canais/criar_canal_page.dart';
+import '../features/canais/entrar_convite.dart';
 import '../features/contribuicao/contribuicao_page.dart';
 import '../features/explorar/explorar_page.dart';
 import '../features/onboarding/boas_vindas_page.dart';
@@ -54,6 +57,18 @@ GoRouter criarRouter({SessaoApp? sessao, String? inicial}) {
             silenciadoInicial: abertura.silenciado,
           );
         },
+      ),
+      GoRoute(
+        path: '/canal/:id/convite',
+        parentNavigatorKey: _chaveRaiz,
+        builder: (_, state) => ConvitePage(canalId: state.pathParameters['id']!),
+      ),
+      GoRoute(path: '/criar-canal', parentNavigatorKey: _chaveRaiz, builder: (_, _) => const CriarCanalPage()),
+      // Link do QR: radiopx://app/convite/<código> (FR-030).
+      GoRoute(
+        path: '/convite/:codigo',
+        parentNavigatorKey: _chaveRaiz,
+        builder: (_, state) => EntrarPorLinkPage(codigo: state.pathParameters['codigo']!),
       ),
       GoRoute(path: '/orbit-virtual', parentNavigatorKey: _chaveRaiz, builder: (_, _) => const OrbitVirtualPage()),
       StatefulShellRoute.indexedStack(

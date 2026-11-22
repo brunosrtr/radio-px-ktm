@@ -16,8 +16,16 @@ var ErrNaoEncontrado = errors.New("canal: não encontrado")
 // CanalDB é a representação persistida de um canal (data-model.md), distinta
 // do hub em memória Canal.
 type CanalDB struct {
-	ID                  string
-	EmpresaID           string
+	ID string
+	// EmpresaID é "" para canais da comunidade (003-rede-orbit, FR-029).
+	EmpresaID string
+	// CriadorID é quem criou o canal (comunidade) ou o primeiro admin da
+	// empresa (canais antigos).
+	CriadorID string
+	// Visibilidade dos canais da comunidade: "publico" ou "privado".
+	Visibilidade string
+	// CodigoConvite dos canais privados da comunidade, sem hífen.
+	CodigoConvite       string
 	Nome                string
 	Descricao           string
 	TipoAcesso          string
@@ -40,32 +48,42 @@ func NovoRepositorio(pool *storage.Pool) *Repositorio {
 	return &Repositorio{pool: pool}
 }
 
-const colunasCanal = `id, empresa_id, nome, coalesce(descricao, ''), tipo_acesso,
+const colunasCanal = `id, coalesce(empresa_id::text, ''), coalesce(criador_id::text, ''), visibilidade,
+	coalesce(codigo_convite, ''), nome, coalesce(descricao, ''), tipo_acesso,
 	limite_participantes, geocerca_ativa, centro_latitude, centro_longitude,
 	raio_metros, ativo`
 
 func escanearCanal(linha interface{ Scan(...any) error }, c *CanalDB) error {
 	return linha.Scan(
-		&c.ID, &c.EmpresaID, &c.Nome, &c.Descricao, &c.TipoAcesso,
+		&c.ID, &c.EmpresaID, &c.CriadorID, &c.Visibilidade, &c.CodigoConvite, &c.Nome, &c.Descricao, &c.TipoAcesso,
 		&c.LimiteParticipantes, &c.GeocercaAtiva, &c.CentroLatitude, &c.CentroLongitude,
 		&c.RaioMetros, &c.Ativo,
 	)
 }
+
+// Comunidade informa se o canal foi criado pela comunidade (sem empresa).
+func (c CanalDB) Comunidade() bool { return c.EmpresaID == "" }
+
+// Publico informa se o canal da comunidade aparece na busca.
+func (c CanalDB) Publico() bool { return c.Visibilidade == "publico" }
 
 // CriarCanal insere um novo canal.
 func (r *Repositorio) CriarCanal(ctx context.Context, c CanalDB) (*CanalDB, error) {
 	err := escanearCanal(r.pool.QueryRow(ctx, `
 		insert into canal (
 			empresa_id, nome, descricao, tipo_acesso, limite_participantes,
-			geocerca_ativa, centro_latitude, centro_longitude, raio_metros
+			geocerca_ativa, centro_latitude, centro_longitude, raio_metros,
+			criador_id, visibilidade, codigo_convite
 		)
-		values ($1, $2, nullif($3, ''), $4, $5, $6, $7, $8, $9)
+		values (nullif($1, '')::uuid, $2, nullif($3, ''), $4, $5, $6, $7, $8, $9,
+			nullif($10, '')::uuid, coalesce(nullif($11, ''), 'privado'), nullif($12, ''))
 		returning `+colunasCanal,
 		c.EmpresaID, c.Nome, c.Descricao, c.TipoAcesso, c.LimiteParticipantes,
 		c.GeocercaAtiva, c.CentroLatitude, c.CentroLongitude, c.RaioMetros,
+		c.CriadorID, c.Visibilidade, c.CodigoConvite,
 	), &c)
 	if err != nil {
-		return nil, fmt.Errorf("canal: erro ao criar canal: %w", err)
+		return nil, fmt.Errorf("canal: erro ao criar canal: %w", erroConvite(err))
 	}
 	return &c, nil
 }
@@ -98,11 +116,14 @@ func (r *Repositorio) AtualizarCanal(ctx context.Context, c CanalDB) (*CanalDB, 
 			geocerca_ativa = $6,
 			centro_latitude = $7,
 			centro_longitude = $8,
-			raio_metros = $9
+			raio_metros = $9,
+			visibilidade = coalesce(nullif($10, ''), visibilidade),
+			codigo_convite = nullif($11, '')
 		where id = $1 and ativo
 		returning `+colunasCanal,
 		c.ID, c.Nome, c.Descricao, c.TipoAcesso, c.LimiteParticipantes,
 		c.GeocercaAtiva, c.CentroLatitude, c.CentroLongitude, c.RaioMetros,
+		c.Visibilidade, c.CodigoConvite,
 	), &c)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNaoEncontrado
@@ -121,8 +142,8 @@ func (r *Repositorio) ListarAutorizados(ctx context.Context, empresaID string) (
 		select `+colunasCanal+`
 		from canal
 		where ativo and (
-			empresa_id = $1
-			or id in (select canal_id from canal_empresa where empresa_id = $1)
+			empresa_id::text = $1
+			or id in (select canal_id from canal_empresa where empresa_id::text = $1)
 		)
 		order by nome
 	`, empresaID)

@@ -279,9 +279,49 @@
 - [X] T084 Testes: `decidirRota`, apresentação → cadastro, navegação entre abas e `widget_test` atualizado; `flutter analyze`, `flutter test` e build iOS
 
 
-## Etapa 6 — Canais da comunidade (US5) · *a detalhar*
+## Etapa 6 — Canais da comunidade (US5)
 
-Inclui a migração `0006_canais_comunidade.sql` e `canal.PodeEntrar` 🔒.
+**Objetivo**: qualquer pessoa cria canal público ou privado, encontra canais na aba Explorar, entra por código ou QR e marca favoritos. O criador convida, remove participantes e apaga o canal.
+
+**Critério de aceite**: criar um canal privado e um segundo usuário entrar nele pelo QR em menos de 1 min (SC-006); testes de `PodeEntrar` 🔒 verdes.
+
+**Ajuste no data-model**: a exclusão de canal usa a coluna `ativo`, que já existe em `canal`, em vez de criar `apagado_em`. O código de convite é guardado sem hífen (8 caracteres) e mostrado como `XXXX-XXXX`.
+
+### Backend
+
+- [X] T085 `backend/migrations/0006_canais_comunidade.sql`:
+  - em `canal`: `empresa_id` aceita nulo; colunas novas `criador_id`, `visibilidade` e `codigo_convite`; criador preenchido nos canais antigos;
+  - tabelas `acesso_canal` e `favorito_canal`;
+  - índice `pg_trgm` no nome;
+  - motivo de saída `removido`
+- [X] T086 🔒 `backend/internal/canal/acesso.go`: função pura `PodeEntrar` (banido → apagado → sem permissão → fora da área → cheio), com teste em `acesso_test.go`
+- [X] T087 `backend/internal/canal/convite.go`: gerar código sem caracteres ambíguos e normalizar o que o usuário digita, com teste
+- [X] T088 `repositorio.go`/`service.go`:
+  - `Criar` para canal da comunidade;
+  - `ListarParaUsuario` (empresa ∪ criados ∪ convites ∪ favoritos, sem banidos);
+  - `Explorar` (busca e proximidade);
+  - `EntrarPorConvite`, `NovoConvite`, `Apagar`, `Remover` (banir), `Favoritar`, `Participantes`;
+  - `ObterParaEntrada` passa a usar `PodeEntrar`
+- [X] T089 `backend/internal/transporte/canais_handler.go` + rotas conforme [contracts/rest-api.md](./contracts/rest-api.md):
+  - `GET /canais` e `GET /canais/explorar`, `GET /canais/{id}`;
+  - `POST /canais` aberto a todos;
+  - `PATCH`/`DELETE /canais/{id}` pelo criador ou admin;
+  - `POST /canais/{id}/convite` e `POST /convites/{codigo}`;
+  - `GET /canais/{id}/participantes` e `DELETE /canais/{id}/participantes/{usuarioId}`;
+  - `PUT /canais/{id}/favorito`
+- [X] T090 Testes de integração: `service_test.go` (fluxo do convite, banido não volta, privado não aparece na busca, apagar desconecta) e testes de contrato
+
+### App
+
+- [X] T091 [P] `app/lib/services/canais_api.dart`: cliente das rotas acima
+- [X] T092 Aba Explorar real: busca, "Perto de mim" / "Todos os públicos", entrar, favoritar, e "Entrar com código ou QR"
+- [X] T093 `app/lib/features/canais/criar_canal_page.dart` (público/privado, limite, área) e botão "+" na aba Canais
+- [X] T094 `app/lib/features/canais/convite_page.dart`: QR (`qr_flutter`), código, copiar, compartilhar e gerar novo
+- [X] T095 Canal ativo: menu do criador (convidar, participantes e remover, apagar), favoritar e avisos de removido ou apagado
+- [X] T096 Deep link `radiopx://app/convite/<código>`: rota `/convite/:codigo`, `intent-filter` no Android e `CFBundleURLTypes` no iOS
+- [X] T097 Testes: normalização do código e telas de Explorar e Criar canal; `flutter analyze`, `flutter test` e build iOS
+
+**Checkpoint**: parar e pedir o aceite do usuário (Princípio II).
 
 ## Etapa 7 — Contribuição e privacidade (US7) · *a detalhar*
 

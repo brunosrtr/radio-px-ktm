@@ -4,8 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+import 'package:go_router/go_router.dart';
+
 import '../../core/http_client.dart';
+import '../../services/canais_api.dart';
 import '../../core/theme.dart';
+import '../../core/token_storage.dart';
 import '../../services/audio_service.dart';
 import '../../services/background_service.dart';
 import '../../services/canal_service.dart';
@@ -54,6 +58,10 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
   String? _avisoRemocao;
   late bool _silenciado = widget.silenciadoInicial;
   final _api = ApiClient();
+  final _canaisApi = CanaisApi();
+
+  /// Detalhes do canal (favorito, se a pessoa gerencia, se é privado).
+  Canal? _detalhe;
 
   Timer? _timeoutConexao;
   Timer? _reconexaoTimer;
@@ -94,6 +102,113 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
       });
     });
     _inicializacao = _iniciar();
+    _carregarDetalhe();
+  }
+
+  Future<void> _carregarDetalhe() async {
+    try {
+      final detalhe = await _canaisApi.detalhar(widget.canalId);
+      if (mounted) setState(() => _detalhe = detalhe);
+    } catch (_) {
+      // Sem detalhes o canal funciona; só somem favorito e o menu do criador.
+    }
+  }
+
+  Future<void> _alternarFavorito() async {
+    final atual = _detalhe;
+    if (atual == null) return;
+    try {
+      await _canaisApi.favoritar(widget.canalId, !atual.favorito);
+      await _carregarDetalhe();
+    } on ErroCanal catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensagem)));
+    }
+  }
+
+  Future<void> _verParticipantes() async {
+    List<Participante> lista;
+    try {
+      lista = await _canaisApi.participantes(widget.canalId);
+    } on ErroCanal catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensagem)));
+      return;
+    }
+    if (!mounted) return;
+    final meuId = TokenStorage.instance.usuario?.id;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (folha) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.only(bottom: 16),
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Quem está no canal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            ),
+            if (lista.isEmpty) const ListTile(title: Text('Ninguém conectado agora.')),
+            for (final p in lista)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.corDoAvatar(p.nome),
+                  child: Text(AppTheme.iniciais(p.nome), style: const TextStyle(color: Colors.white)),
+                ),
+                title: Text(p.nome),
+                trailing: p.usuarioId == meuId
+                    ? const Text('você')
+                    : TextButton(
+                        style: TextButton.styleFrom(foregroundColor: Theme.of(folha).colorScheme.error),
+                        onPressed: () async {
+                          final confirmou = await _confirmar(
+                            'Remover ${p.nome}?',
+                            'A pessoa sai do canal agora e não consegue voltar, nem com o convite.',
+                            'Remover',
+                          );
+                          if (!confirmou) return;
+                          try {
+                            await _canaisApi.remover(widget.canalId, p.usuarioId);
+                            if (folha.mounted) Navigator.of(folha).pop();
+                          } on ErroCanal catch (e) {
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensagem)));
+                          }
+                        },
+                        child: const Text('Remover'),
+                      ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmar(String titulo, String texto, String acao) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(titulo),
+        content: Text(texto),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(c).colorScheme.error),
+            onPressed: () => Navigator.of(c).pop(true),
+            child: Text(acao),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _apagarCanal() async {
+    if (!await _confirmar('Apagar este canal?', 'Todos saem agora e o canal some para sempre.', 'Apagar')) return;
+    try {
+      await _canaisApi.apagar(widget.canalId);
+      if (mounted) Navigator.of(context).pop();
+    } on ErroCanal catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.mensagem)));
+    }
   }
 
   Future<void> _iniciar() async {
@@ -294,6 +409,10 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
         return 'Você foi removido do canal por limite de participantes.';
       case 'canal_desativado':
         return 'Este canal foi desativado.';
+      case 'canal_apagado':
+        return 'O criador apagou este canal.';
+      case 'removido':
+        return 'O criador do canal removeu você.';
       default:
         return 'Você foi removido do canal.';
     }
@@ -419,6 +538,32 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
                         ],
                       ),
                     ),
+                    if (_detalhe != null && _detalhe!.comunidade)
+                      IconButton(
+                        tooltip: _detalhe!.favorito ? 'Tirar dos favoritos' : 'Favoritar',
+                        onPressed: _alternarFavorito,
+                        icon: Icon(_detalhe!.favorito ? Icons.star : Icons.star_border, color: _detalhe!.favorito ? Colors.amber : null),
+                      ),
+                    if (_detalhe?.podeGerenciar ?? false)
+                      PopupMenuButton<String>(
+                        tooltip: 'Gerenciar canal',
+                        onSelected: (acao) {
+                          switch (acao) {
+                            case 'convidar':
+                              context.push('/canal/${widget.canalId}/convite');
+                            case 'participantes':
+                              _verParticipantes();
+                            case 'apagar':
+                              _apagarCanal();
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          if (_detalhe!.privado)
+                            const PopupMenuItem(value: 'convidar', child: ListTile(leading: Icon(Icons.qr_code_2), title: Text('Convidar'))),
+                          const PopupMenuItem(value: 'participantes', child: ListTile(leading: Icon(Icons.group_outlined), title: Text('Quem está no canal'))),
+                          const PopupMenuItem(value: 'apagar', child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Apagar canal'))),
+                        ],
+                      ),
                   ],
                 ),
                 if (!_audioDestravado)

@@ -52,12 +52,14 @@ Erros seguem o mesmo formato: `{"codigo": "...", "mensagem": "..."}`.
 | Método | Rota | Papel | Descrição |
 |---|---|---|---|
 | GET | `/canais` | todos | Canais acessíveis (meus, favoritos, liberados por convite, de empresa) |
-| GET | `/canais/explorar?q=&lat=&lng=` | todos | Canais públicos por nome e/ou próximos (FR-030) |
+| GET | `/canais/explorar?q=&lat=&lng=&perto=true` | todos | Canais públicos da comunidade: por nome (`q`) e, com `perto=true` e posição, só os com área a até 50 km, do mais perto ao mais longe; sem `perto`, os mais cheios primeiro (FR-030) |
+| GET | `/canais/{id}` | quem pode ver | Detalhe; `codigo_convite` só para quem gerencia; `sou_criador`, `pode_gerenciar`, `favorito` |
+| GET | `/canais/{id}/participantes` | criador / admin da empresa | Quem está conectado agora |
 | POST | `/canais` | todos | Cria canal da comunidade (FR-029) |
 | PATCH | `/canais/{id}` | criador / admin da empresa | Edita |
 | DELETE | `/canais/{id}` | criador / admin da empresa | Apaga (desconecta participantes) |
 | POST | `/canais/{id}/convite` | criador | Gera novo código (invalida o anterior) |
-| POST | `/convites/{codigo}` | todos | Entra por convite → `acesso_canal` liberado |
+| POST | `/convites/{codigo}` | todos | Entra por convite (aceita `XXXX-XXXX`, sem hífen ou o link do QR) → `acesso_canal` liberado; `404 convite_invalido`, `403 banido` |
 | DELETE | `/canais/{id}/participantes/{usuarioId}` | criador | Remove e bane (FR-031) |
 | PUT | `/canais/{id}/favorito` | todos | `{"favorito": true\|false}` (FR-032) |
 | PUT | `/canais/{id}/preferencia` | todos | Silenciar (001, sem mudança) |
@@ -77,7 +79,9 @@ As rotas `/canais/{id}/empresas` da 001 continuam para canais de empresa.
   "codigo_convite": null, "sou_criador": true, ... }
 ```
 
-Erros de entrada no canal (no `GET /canais/{id}` ou na entrada via WS): `banido`, `sem_permissao`, `fora_geocerca`, `canal_cheio`, `nao_encontrado` (ver data-model §3).
+O código de convite tem 8 caracteres sem ambiguidade (sem 0/O, 1/I/L), é mostrado como `XXXX-XXXX` e vai no QR como `radiopx://app/convite/<código sem hífen>`. Quem não é admin de empresa cria canal da comunidade; admin de empresa continua criando canal da empresa (`tipo_acesso`, 001).
+
+Erros de entrada no canal (no `GET /canais/{id}` ou na entrada via WS): `banido`, `sem_permissao`, `fora_geocerca`, `limite_atingido`, `nao_encontrado` (ver data-model §3).
 
 ## Rede Orbit
 
