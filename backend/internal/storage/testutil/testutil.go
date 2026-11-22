@@ -76,6 +76,22 @@ func CriarUsuario(t *testing.T, pool *storage.Pool, empresaID, papel string) str
 	return id
 }
 
+// CriarUsuarioPublico insere uma conta do público (papel "usuario", sem
+// empresa, e-mail único) e devolve seu ID.
+func CriarUsuarioPublico(t *testing.T, pool *storage.Pool) string {
+	t.Helper()
+	var id string
+	err := pool.QueryRow(context.Background(), `
+		insert into usuario (nome, apelido, email, senha_hash, papel)
+		values ('Pessoa Teste', 'Teste', $1, 'hash', 'usuario')
+		returning id
+	`, "teste-"+aleatorio()+"@exemplo.com").Scan(&id)
+	if err != nil {
+		t.Fatalf("erro ao criar usuário do público de teste: %v", err)
+	}
+	return id
+}
+
 func aleatorio() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)

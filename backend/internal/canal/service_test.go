@@ -117,3 +117,43 @@ func TestListarParaMotoristaFiltraPorAutorizacaoDeEmpresa(t *testing.T) {
 		t.Errorf("canal privado de empresa não autorizada (%s) não deveria aparecer na listagem", canalPrivadoC.ID)
 	}
 }
+
+// Princípio IV / FR-033: uma conta do público (sem empresa) não pode listar
+// nem entrar em canais de empresa — privados ou compartilhados — mesmo que o
+// ID vazio de empresa chegue até o serviço.
+func TestUsuarioSemEmpresaNaoAcessaCanalDeEmpresa(t *testing.T) {
+	pool := testutil.AbrirPool(t)
+	ctx := context.Background()
+
+	empresa := testutil.CriarEmpresa(t, pool)
+	parceira := testutil.CriarEmpresa(t, pool)
+	publico := testutil.CriarUsuarioPublico(t, pool)
+
+	servico := NovoServico(NovoRepositorio(pool), NovoGerenciador(), posicao.NovoRepositorio(pool))
+
+	privado, err := servico.Criar(ctx, empresa, DTOCanal{Nome: "Privado", TipoAcesso: "privado", LimiteParticipantes: 10})
+	if err != nil {
+		t.Fatalf("erro ao criar canal privado: %v", err)
+	}
+	compartilhado, err := servico.Criar(ctx, empresa, DTOCanal{Nome: "Compartilhado", TipoAcesso: "compartilhado", LimiteParticipantes: 10})
+	if err != nil {
+		t.Fatalf("erro ao criar canal compartilhado: %v", err)
+	}
+	if err := servico.LiberarEmpresa(ctx, compartilhado.ID, empresa, parceira); err != nil {
+		t.Fatalf("erro ao liberar canal compartilhado: %v", err)
+	}
+
+	listados, err := servico.ListarParaMotorista(ctx, "", publico)
+	if err != nil {
+		t.Fatalf("erro ao listar canais para usuário sem empresa: %v", err)
+	}
+	if len(listados) != 0 {
+		t.Fatalf("usuário sem empresa não deveria ver canais de empresa, viu %d", len(listados))
+	}
+
+	for _, canalID := range []string{privado.ID, compartilhado.ID} {
+		if _, err := servico.ObterParaEntrada(ctx, canalID, "", publico); !errors.Is(err, ErrSemPermissao) {
+			t.Errorf("entrada no canal %s sem empresa: esperava ErrSemPermissao, veio %v", canalID, err)
+		}
+	}
+}

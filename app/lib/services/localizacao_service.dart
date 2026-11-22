@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 
 import '../core/http_client.dart';
+import '../core/token_storage.dart';
 import '../data/fila_posicoes_local.dart';
 
 /// Decide se um novo ponto deve ser persistido, segundo o filtro de
@@ -38,6 +39,17 @@ class LocalizacaoService {
   Position? _ultimaCapturada;
   DateTime? _ultimaCapturadaEm;
 
+  /// Contas sem empresa não têm histórico de posições (FR-034 da
+  /// 003-rede-orbit): só a posição atual é enviada, por PUT /posicao-atual,
+  /// para a geocerca e os canais próximos.
+  bool _somenteAtual = false;
+  PontoLocal? _atualPendente;
+
+  static bool get _semEmpresa => !(TokenStorage.instance.usuario?.temEmpresa ?? false);
+
+  Future<void> _enviarPosicaoAtual(PontoLocal ponto) =>
+      _apiClient.dio.put('/posicao-atual', data: ponto.paraJson());
+
   /// Atualiza a posição antes da consulta/entrada em canais com geocerca.
   /// Evita exigir uma participação em canal para obter o primeiro GPS.
   Future<void> atualizarPosicaoParaEntrada() async {
@@ -56,30 +68,29 @@ class LocalizacaoService {
         'Permita localização para acessar canais com área limitada.',
       );
     }
-    final ponto = await Geolocator.getCurrentPosition(
+    final posicao = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         timeLimit: Duration(seconds: 10),
       ),
     );
-    await _apiClient.dio.post(
-      '/posicoes',
-      data: {
-        'pontos': [
-          PontoLocal(
-            latitude: ponto.latitude,
-            longitude: ponto.longitude,
-            precisaoMetros: ponto.accuracy,
-            velocidadeKmh: ponto.speed < 0 ? null : ponto.speed * 3.6,
-            capturadoEm: DateTime.now().toUtc(),
-          ).paraJson(),
-        ],
-      },
+    final ponto = PontoLocal(
+      latitude: posicao.latitude,
+      longitude: posicao.longitude,
+      precisaoMetros: posicao.accuracy,
+      velocidadeKmh: posicao.speed < 0 ? null : posicao.speed * 3.6,
+      capturadoEm: DateTime.now().toUtc(),
     );
+    if (_semEmpresa) {
+      await _enviarPosicaoAtual(ponto);
+    } else {
+      await _apiClient.dio.post('/posicoes', data: {'pontos': [ponto.paraJson()]});
+    }
   }
 
   Future<void> iniciar() async {
-    await _fila.abrir();
+    _somenteAtual = _semEmpresa;
+    if (!_somenteAtual) await _fila.abrir();
 
     var permissao = await Geolocator.checkPermission();
     if (permissao == LocationPermission.denied) {
@@ -105,17 +116,18 @@ class LocalizacaoService {
     _ultimaCapturada = posicao;
     _ultimaCapturadaEm = agora;
 
-    unawaited(
-      _fila.adicionar(
-        PontoLocal(
-          latitude: posicao.latitude,
-          longitude: posicao.longitude,
-          precisaoMetros: posicao.accuracy,
-          velocidadeKmh: posicao.speed * 3.6,
-          capturadoEm: agora.toUtc(),
-        ),
-      ),
+    final ponto = PontoLocal(
+      latitude: posicao.latitude,
+      longitude: posicao.longitude,
+      precisaoMetros: posicao.accuracy,
+      velocidadeKmh: posicao.speed < 0 ? null : posicao.speed * 3.6,
+      capturadoEm: agora.toUtc(),
     );
+    if (_somenteAtual) {
+      _atualPendente = ponto;
+      return;
+    }
+    unawaited(_fila.adicionar(ponto));
   }
 
   bool _deveRegistrar(Position posicao, DateTime agora) {
@@ -138,6 +150,17 @@ class LocalizacaoService {
   /// o servidor confirmou — em caso de falha (sem sinal, erro do servidor),
   /// os pontos continuam na fila para o próximo ciclo.
   Future<void> enviarLotePendente() async {
+    if (_somenteAtual) {
+      final ponto = _atualPendente;
+      if (ponto == null) return;
+      try {
+        await _enviarPosicaoAtual(ponto);
+        if (identical(_atualPendente, ponto)) _atualPendente = null;
+      } catch (_) {
+        // Tenta de novo no próximo ciclo; só a posição mais recente importa.
+      }
+      return;
+    }
     final pendentes = _fila.listarPendentes();
     if (pendentes.isEmpty) return;
 

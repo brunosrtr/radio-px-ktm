@@ -23,6 +23,7 @@ func NovoCanaisHandler(servico *canal.Servico) *CanaisHandler {
 }
 
 type corpoCanal struct {
+	Visibilidade        string   `json:"visibilidade"`
 	Nome                string   `json:"nome"`
 	Descricao           string   `json:"descricao"`
 	TipoAcesso          string   `json:"tipo_acesso"`
@@ -31,6 +32,13 @@ type corpoCanal struct {
 	CentroLatitude      *float64 `json:"centro_latitude"`
 	CentroLongitude     *float64 `json:"centro_longitude"`
 	RaioMetros          *int     `json:"raio_metros"`
+	// Geocerca no formato do contrato da 003 (o painel usa os campos soltos
+	// acima).
+	Geocerca *struct {
+		Latitude   float64 `json:"latitude"`
+		Longitude  float64 `json:"longitude"`
+		RaioMetros int     `json:"raio_metros"`
+	} `json:"geocerca"`
 }
 
 func (c corpoCanal) paraDTO() canal.DTOCanal {
@@ -38,7 +46,12 @@ func (c corpoCanal) paraDTO() canal.DTOCanal {
 	if tipoAcesso == "" {
 		tipoAcesso = "privado"
 	}
+	if c.Geocerca != nil {
+		lat, lng, raio := c.Geocerca.Latitude, c.Geocerca.Longitude, c.Geocerca.RaioMetros
+		c.GeocercaAtiva, c.CentroLatitude, c.CentroLongitude, c.RaioMetros = true, &lat, &lng, &raio
+	}
 	return canal.DTOCanal{
+		Visibilidade:        c.Visibilidade,
 		Nome:                c.Nome,
 		Descricao:           c.Descricao,
 		TipoAcesso:          tipoAcesso,
@@ -50,10 +63,22 @@ func (c corpoCanal) paraDTO() canal.DTOCanal {
 	}
 }
 
+// canalParaJSON serializa um canal para quem pode gerenciá-lo — inclui o
+// código de convite.
 func canalParaJSON(c *canal.CanalDB) map[string]any {
+	var empresaID, codigo any
+	if c.EmpresaID != "" {
+		empresaID = c.EmpresaID
+	}
+	if c.CodigoConvite != "" {
+		codigo = canal.FormatarCodigoConvite(c.CodigoConvite)
+	}
 	return map[string]any{
 		"id":                   c.ID,
-		"empresa_id":           c.EmpresaID,
+		"empresa_id":           empresaID,
+		"comunidade":           c.Comunidade(),
+		"visibilidade":         c.Visibilidade,
+		"codigo_convite":       codigo,
 		"nome":                 c.Nome,
 		"descricao":            c.Descricao,
 		"tipo_acesso":          c.TipoAcesso,
@@ -78,9 +103,26 @@ func exigirAdmin(w http.ResponseWriter, r *http.Request) (*auth.Claims, bool) {
 	return claims, true
 }
 
-// Criar implementa POST /canais (admin).
+func autorDe(claims *auth.Claims) canal.Autor {
+	return canal.Autor{
+		UsuarioID:    claims.UsuarioID,
+		EmpresaID:    claims.EmpresaID,
+		AdminEmpresa: claims.Papel == auth.PapelAdmin && claims.TemEmpresa(),
+	}
+}
+
+func claimsOu401(w http.ResponseWriter, r *http.Request) (*auth.Claims, bool) {
+	claims, ok := auth.ClaimsDoContexto(r.Context())
+	if !ok {
+		responderErro(w, http.StatusUnauthorized, "token_invalido", "token ausente ou inválido")
+	}
+	return claims, ok
+}
+
+// Criar implementa POST /canais: admin de empresa cria canal da empresa
+// (001); qualquer outra conta cria canal da comunidade (FR-029).
 func (h *CanaisHandler) Criar(w http.ResponseWriter, r *http.Request) {
-	claims, ok := exigirAdmin(w, r)
+	claims, ok := claimsOu401(w, r)
 	if !ok {
 		return
 	}
@@ -91,7 +133,7 @@ func (h *CanaisHandler) Criar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.servico.Criar(r.Context(), claims.EmpresaID, corpo.paraDTO())
+	c, err := h.servico.CriarComo(r.Context(), autorDe(claims), corpo.paraDTO())
 	if err != nil {
 		responderErroServico(w, err)
 		return
@@ -99,9 +141,10 @@ func (h *CanaisHandler) Criar(w http.ResponseWriter, r *http.Request) {
 	responderJSON(w, http.StatusCreated, canalParaJSON(c))
 }
 
-// Editar implementa PATCH /canais/{id} (admin).
+// Editar implementa PATCH /canais/{id}: criador do canal da comunidade ou
+// admin da empresa dona (FR-031).
 func (h *CanaisHandler) Editar(w http.ResponseWriter, r *http.Request) {
-	claims, ok := exigirAdmin(w, r)
+	claims, ok := claimsOu401(w, r)
 	if !ok {
 		return
 	}
@@ -112,7 +155,7 @@ func (h *CanaisHandler) Editar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.servico.Editar(r.Context(), chi.URLParam(r, "id"), claims.EmpresaID, corpo.paraDTO())
+	c, err := h.servico.EditarComo(r.Context(), chi.URLParam(r, "id"), autorDe(claims), corpo.paraDTO())
 	if err != nil {
 		responderErroServico(w, err)
 		return
@@ -206,6 +249,11 @@ func (h *CanaisHandler) Listar(w http.ResponseWriter, r *http.Request) {
 			"participantes_atual":  c.ParticipantesAtual,
 			"geocerca_ativa":       c.GeocercaAtiva,
 			"silenciado":           c.Silenciado,
+			"descricao":            c.Descricao,
+			"comunidade":           c.Comunidade(),
+			"visibilidade":         c.Visibilidade,
+			"favorito":             c.Favorito,
+			"sou_criador":          c.SouCriador,
 		})
 	}
 	responderJSON(w, http.StatusOK, map[string]any{"canais": canais})

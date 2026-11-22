@@ -26,8 +26,14 @@ func responderErroServico(w http.ResponseWriter, err error) {
 		responderErro(w, http.StatusUnprocessableEntity, "canal_invalido", err.Error())
 	case errors.Is(err, canal.ErrNaoEncontrado):
 		responderErro(w, http.StatusNotFound, "nao_encontrado", "canal não encontrado")
+	case errors.Is(err, canal.ErrBanido):
+		responderErro(w, http.StatusForbidden, "banido", "você foi removido deste canal")
 	case errors.Is(err, canal.ErrSemPermissao):
-		responderErro(w, http.StatusForbidden, "sem_permissao", "ação fora do escopo da sua empresa")
+		responderErro(w, http.StatusForbidden, "sem_permissao", "você não tem acesso a este canal")
+	case errors.Is(err, canal.ErrNaoPodeRemoverSiMesmo):
+		responderErro(w, http.StatusUnprocessableEntity, "canal_invalido", "o criador não pode se remover do próprio canal")
+	case errors.Is(err, canal.ErrForaDaArea):
+		responderErro(w, http.StatusForbidden, "fora_geocerca", "você está fora da área do canal")
 	default:
 		responderErro(w, http.StatusInternalServerError, "erro_interno", "erro interno")
 	}

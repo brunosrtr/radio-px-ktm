@@ -12,15 +12,46 @@ type Config struct {
 	DatabaseURL string
 	JWTSecret   string
 	Porta       string
+	SMTP        SMTP
+	// PontoIDSegredo assina o ponto_id anônimo e rotativo das leituras Orbit
+	// (Princípio VII). Sem PONTO_ID_SEGREDO, é derivado de JWT_SECRET.
+	PontoIDSegredo string
+	// KTMIntegracaoURL, se definida, recebe por POST as leituras Orbit
+	// (research.md §6). Vazia = só o painel Rede Orbit.
+	KTMIntegracaoURL string
+}
+
+// SMTP configura o envio de e-mail da recuperação de senha (FR-025). É
+// opcional: sem host, a recuperação responde 503 em vez de falhar o boot.
+type SMTP struct {
+	Host      string
+	Porta     string
+	Usuario   string
+	Senha     string
+	Remetente string
+}
+
+// SMTPConfigurado informa se há servidor SMTP para enviar e-mails.
+func (c Config) SMTPConfigurado() bool {
+	return c.SMTP.Host != ""
 }
 
 // Load lê a configuração das variáveis de ambiente do processo, retornando
 // erro se alguma variável obrigatória estiver ausente.
 func Load() (Config, error) {
 	cfg := Config{
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
-		Porta:       os.Getenv("PORT"),
+		DatabaseURL:      os.Getenv("DATABASE_URL"),
+		JWTSecret:        os.Getenv("JWT_SECRET"),
+		Porta:            os.Getenv("PORT"),
+		PontoIDSegredo:   os.Getenv("PONTO_ID_SEGREDO"),
+		KTMIntegracaoURL: os.Getenv("KTM_INTEGRACAO_URL"),
+		SMTP: SMTP{
+			Host:      os.Getenv("SMTP_HOST"),
+			Porta:     os.Getenv("SMTP_PORTA"),
+			Usuario:   os.Getenv("SMTP_USUARIO"),
+			Senha:     os.Getenv("SMTP_SENHA"),
+			Remetente: os.Getenv("SMTP_REMETENTE"),
+		},
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -31,6 +62,15 @@ func Load() (Config, error) {
 	}
 	if cfg.Porta == "" {
 		cfg.Porta = "8080"
+	}
+	if cfg.PontoIDSegredo == "" {
+		cfg.PontoIDSegredo = "ponto-id|" + cfg.JWTSecret
+	}
+	if cfg.SMTP.Porta == "" {
+		cfg.SMTP.Porta = "25"
+	}
+	if cfg.SMTP.Remetente == "" {
+		cfg.SMTP.Remetente = "nao-responda@radiopx.local"
 	}
 
 	return cfg, nil

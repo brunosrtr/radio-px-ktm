@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/redelocal"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/retencao"
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/config"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
@@ -31,6 +33,9 @@ func main() {
 	if err := pool.AplicarMigracoes(ctx); err != nil {
 		log.Fatalf("erro ao aplicar migrações: %v", err)
 	}
+
+	// Apaga leituras e posições com mais de 90 dias (prazo de guarda).
+	go retencao.Rodar(ctx, pool, 24*time.Hour)
 
 	roteador := transporte.NovoRoteador(cfg, pool)
 

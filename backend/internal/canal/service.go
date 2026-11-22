@@ -26,6 +26,8 @@ var limitesValidos = map[int]bool{5: true, 10: true, 15: true, 20: true}
 // DTOCanal reúne os campos editáveis de um canal, usados tanto na criação
 // quanto na edição (contracts/rest-api.md).
 type DTOCanal struct {
+	// Visibilidade só vale para canais da comunidade: "publico" ou "privado".
+	Visibilidade        string
 	Nome                string
 	Descricao           string
 	TipoAcesso          string
@@ -41,6 +43,8 @@ type CanalListado struct {
 	CanalDB
 	ParticipantesAtual int
 	Silenciado         bool
+	Favorito           bool
+	SouCriador         bool
 }
 
 // Servico implementa as regras de negócio de gestão de canais e controle de
@@ -185,47 +189,63 @@ func (s *Servico) DefinirPreferencia(ctx context.Context, usuarioID, canalID str
 	return nil
 }
 
-// ObterParaEntrada busca um canal, confirma que a empresa informada tem
-// autorização de acesso e, se a geocerca estiver ativa, que a última posição
-// conhecida do motorista está dentro do raio (FR-014/FR-015) — usado pelo
-// handler WebSocket em entrar_canal.
+// ObterParaEntrada busca um canal e decide, com PodeEntrar, se o usuário
+// pode entrar: banido, canal apagado, sem permissão (empresa, convite) e
+// geocerca (FR-014/FR-015). O limite de participantes é conferido de forma
+// atômica pelo hub na entrada.
 func (s *Servico) ObterParaEntrada(ctx context.Context, canalID, empresaID, usuarioID string) (*CanalDB, error) {
 	c, err := s.repositorio.ObterCanal(ctx, canalID)
 	if err != nil {
 		return nil, err
 	}
-
-	autorizado := c.EmpresaID == empresaID
-	if !autorizado {
-		autorizado, err = s.repositorio.EstaAutorizada(ctx, canalID, empresaID)
-		if err != nil {
-			return nil, err
-		}
+	acesso, err := s.montarAcesso(ctx, c, empresaID, usuarioID)
+	if err != nil {
+		return nil, err
 	}
-	if !autorizado {
-		return nil, ErrSemPermissao
-	}
-
 	if c.GeocercaAtiva {
-		pos, err := s.posicoes.ObterAtual(ctx, usuarioID)
-		if err != nil {
-			return nil, ErrForaDaArea
-		}
-		if !geofence.DentroDoRaio(pos.Latitude, pos.Longitude, *c.CentroLatitude, *c.CentroLongitude, *c.RaioMetros) {
-			return nil, ErrForaDaArea
+		acesso.GeocercaAtiva = true
+		if pos, err := s.posicoes.ObterAtual(ctx, usuarioID); err == nil {
+			acesso.DentroDaArea = geofence.DentroDoRaio(pos.Latitude, pos.Longitude, *c.CentroLatitude, *c.CentroLongitude, *c.RaioMetros)
 		}
 	}
-
+	if err := PodeEntrar(acesso); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
-// ListarParaMotorista retorna os canais autorizados para a empresa do
-// motorista, com o total de participantes atuais (do hub em memória), se o
-// próprio motorista o silenciou (RNF12), e já excluindo canais com geocerca
-// ativa fora do alcance da última posição conhecida do motorista (FR-014,
-// FR-015, FR-029).
+// montarAcesso preenche o que PodeEntrar precisa sobre o usuário e o canal
+// (sem geocerca nem lotação).
+func (s *Servico) montarAcesso(ctx context.Context, c *CanalDB, empresaID, usuarioID string) (Acesso, error) {
+	acesso := Acesso{
+		Comunidade: c.Comunidade(),
+		Publico:    c.Publico(),
+		EhCriador:  c.CriadorID != "" && c.CriadorID == usuarioID,
+	}
+	situacao, err := s.repositorio.SituacaoAcesso(ctx, c.ID, usuarioID)
+	if err != nil {
+		return acesso, err
+	}
+	acesso.Situacao = situacao
+	// Empresa vazia (conta do público) nunca autoriza canal de empresa.
+	if !c.Comunidade() && empresaID != "" {
+		acesso.EmpresaAutorizada = c.EmpresaID == empresaID
+		if !acesso.EmpresaAutorizada {
+			if acesso.EmpresaAutorizada, err = s.repositorio.EstaAutorizada(ctx, c.ID, empresaID); err != nil {
+				return acesso, err
+			}
+		}
+	}
+	return acesso, nil
+}
+
+// ListarParaMotorista retorna os canais que o usuário pode usar — os da
+// empresa dele, os que criou, os privados em que entrou por convite e os
+// públicos favoritos (FR-029 a FR-032) — com participantes atuais (do hub em
+// memória) e silenciamento, já excluindo canais com geocerca fora do alcance
+// da última posição conhecida (FR-014, FR-015).
 func (s *Servico) ListarParaMotorista(ctx context.Context, empresaID, usuarioID string) ([]CanalListado, error) {
-	canais, err := s.repositorio.ListarAutorizados(ctx, empresaID)
+	canais, err := s.repositorio.ListarParaUsuario(ctx, usuarioID, empresaID)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +262,9 @@ func (s *Servico) ListarParaMotorista(ctx context.Context, empresaID, usuarioID 
 
 	listados := make([]CanalListado, 0, len(canais))
 	for _, c := range canais {
-		if c.GeocercaAtiva {
+		criador := c.CriadorID == usuarioID
+		// O criador sempre vê o próprio canal, mesmo fora da área.
+		if c.GeocercaAtiva && !criador {
 			if posicaoAtual == nil {
 				continue
 			}
@@ -250,16 +272,20 @@ func (s *Servico) ListarParaMotorista(ctx context.Context, empresaID, usuarioID 
 				continue
 			}
 		}
-
-		participantesAtual := 0
-		if hub, ok := s.gerenciador.Obter(c.ID); ok {
-			participantesAtual = hub.Participantes()
-		}
 		listados = append(listados, CanalListado{
-			CanalDB:            c,
-			ParticipantesAtual: participantesAtual,
+			CanalDB:            c.CanalDB,
+			ParticipantesAtual: s.participantesAgora(c.ID),
 			Silenciado:         preferencias[c.ID],
+			Favorito:           c.Favorito,
+			SouCriador:         criador,
 		})
 	}
 	return listados, nil
+}
+
+func (s *Servico) participantesAgora(canalID string) int {
+	if hub, ok := s.gerenciador.Obter(canalID); ok {
+		return hub.Participantes()
+	}
+	return 0
 }

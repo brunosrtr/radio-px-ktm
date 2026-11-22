@@ -59,6 +59,24 @@ func (s *Servico) IngerirLote(ctx context.Context, usuarioID string, pontos []Po
 	return nil
 }
 
+// AtualizarAtual grava só a posição atual (sem histórico) e reavalia a
+// geocerca dos canais em que o usuário está — FR-034 da 003-rede-orbit.
+func (s *Servico) AtualizarAtual(ctx context.Context, usuarioID string, p Ponto) error {
+	if p.CapturadoEm.IsZero() {
+		return fmt.Errorf("%w: capturado_em é obrigatório", ErrLoteInvalido)
+	}
+	if p.Latitude < -90 || p.Latitude > 90 || p.Longitude < -180 || p.Longitude > 180 {
+		return fmt.Errorf("%w: coordenadas inválidas", ErrLoteInvalido)
+	}
+	if err := s.repositorio.AtualizarAtual(ctx, usuarioID, p); err != nil {
+		return err
+	}
+	if s.verificador != nil {
+		s.verificador.VerificarPosicao(ctx, usuarioID, p.Latitude, p.Longitude)
+	}
+	return nil
+}
+
 // PosicoesAtuaisPorEmpresa retorna a posição atual dos motoristas de
 // empresaAlvoID, mas só quando ela é a mesma empresa do solicitante — nunca
 // a de outra empresa (FR-026).

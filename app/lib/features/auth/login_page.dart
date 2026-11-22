@@ -1,14 +1,15 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/routes.dart';
+import '../../core/sessao_app.dart';
 import '../../core/theme.dart';
 import '../../core/rede_local.dart';
 import 'auth_service.dart';
 import 'conexao_local.dart';
 
-/// Tela de login — contas são fornecidas pela empresa, sem autocadastro
-/// (research.md §5).
+/// Tela de login. Contas do público entram com e-mail; contas de empresa
+/// (001) continuam entrando com CPF ou login. Leva ao cadastro aberto e à
+/// recuperação de senha (003-rede-orbit, FR-023/FR-025).
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -40,19 +41,21 @@ class _LoginPageState extends State<LoginPage> {
         _senhaController.text,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.canais);
-    } on DioException catch (e) {
+      SessaoApp.instance.entrou();
+      context.go('/canais');
+    } on ErroConta catch (e) {
       if (!mounted) return;
-      final dados = e.response?.data;
-      final mensagem = dados is Map ? dados['mensagem'] as String? : null;
-      setState(
-        () => _erro =
-            mensagem ??
-            e.message ??
-            'Não foi possível entrar. Verifique login e senha.',
-      );
+      setState(() => _erro = e.mensagem);
     } finally {
       if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  Future<void> _recuperarSenha() async {
+    final email = await context.push<String>('/recuperar-senha');
+    if (email != null && mounted) {
+      _loginController.text = email;
+      _senhaController.clear();
     }
   }
 
@@ -88,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       IconButton(
                         onPressed: () =>
-                            Navigator.of(context).pushNamed(AppRoutes.sobre),
+                            context.push('/sobre'),
                         tooltip: 'Sobre a KTM',
                         icon: const Icon(
                           Icons.info_outline,
@@ -174,7 +177,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Use a conta fornecida pela sua empresa.',
+                              'Entre com seu e-mail. Motoristas de empresa usam o CPF ou login de sempre.',
                               style: tema.textTheme.bodySmall,
                             ),
                             const SizedBox(height: 22),
@@ -193,14 +196,16 @@ class _LoginPageState extends State<LoginPage> {
                             ],
                             TextFormField(
                               controller: _loginController,
-                              autofillHints: const [AutofillHints.username],
+                              autofillHints: const [AutofillHints.email, AutofillHints.username],
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
                               decoration: const InputDecoration(
-                                labelText: 'CPF ou login',
+                                labelText: 'E-mail ou login',
                                 prefixIcon: Icon(Icons.person_outline),
                               ),
                               textInputAction: TextInputAction.next,
                               validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Informe seu CPF ou login'
+                                  ? 'Informe seu e-mail ou login'
                                   : null,
                             ),
                             const SizedBox(height: 16),
@@ -230,8 +235,15 @@ class _LoginPageState extends State<LoginPage> {
                                   ? 'Informe a senha'
                                   : null,
                             ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _carregando ? null : _recuperarSenha,
+                                child: const Text('Esqueci minha senha'),
+                              ),
+                            ),
                             if (_erro != null) ...[
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 8),
                               Text(
                                 _erro!,
                                 style: TextStyle(
@@ -261,7 +273,13 @@ class _LoginPageState extends State<LoginPage> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Entrar no Rádio PX'),
+                                        Flexible(
+                                          child: Text(
+                                            'Entrar no Rádio PX',
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
                                         Icon(
                                           Icons.arrow_forward,
                                           color: AppTheme.azulPrimario,
@@ -270,13 +288,15 @@ class _LoginPageState extends State<LoginPage> {
                                       ],
                                     ),
                             ),
-                            const SizedBox(height: 18),
-                            Text(
-                              'Precisa de uma conta? Fale com o administrador da sua empresa.',
-                              textAlign: TextAlign.center,
-                              style: tema.textTheme.bodySmall?.copyWith(
-                                height: 1.6,
+                            const SizedBox(height: 12),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(52),
                               ),
+                              onPressed: _carregando
+                                  ? null
+                                  : () => context.go('/cadastro'),
+                              child: const Text('Criar conta grátis'),
                             ),
                           ],
                         ),
@@ -287,7 +307,7 @@ class _LoginPageState extends State<LoginPage> {
                   Center(
                     child: TextButton(
                       onPressed: () =>
-                          Navigator.of(context).pushNamed(AppRoutes.sobre),
+                          context.push('/sobre'),
                       child: const Text(
                         'Conheça a KTM Indústria',
                         style: TextStyle(

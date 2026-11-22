@@ -1,29 +1,40 @@
 // Comando seed cria uma empresa e três usuários de teste (um admin, dois
 // motoristas) para exercitar o app e o painel manualmente em ambiente local,
 // sem depender de telas de gestão ainda não implementadas.
+//
+// Com -demo, cria em vez disso os dados da demonstração da Rede Orbit
+// (roteiro-demo.md da 003-rede-orbit): contas admin_ktm e demo, três Orbits
+// virtuais, quatro pórticos simulados em volta de -centro e dois canais
+// públicos. Pode rodar várias vezes; -zerar volta a demo ao estado inicial.
 package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/auth"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/config"
+	"github.com/brunosrtr/radio-px-ktm/backend/internal/demo"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/empresa"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/storage"
 	"github.com/brunosrtr/radio-px-ktm/backend/internal/usuario"
 )
 
 var contas = []struct {
-	nome, login, senha, papel string
+	nome, apelido, login, senha, papel string
 }{
-	{"Admin Teste", "admin", "admin123", usuario.PapelAdmin},
-	{"Motorista Um", "motorista1", "motorista123", usuario.PapelMotorista},
-	{"Motorista Dois", "motorista2", "motorista123", usuario.PapelMotorista},
+	{"Admin Teste", "Admin", "admin", "admin123", usuario.PapelAdmin},
+	{"Motorista Um", "Motorista Um", "motorista1", "motorista123", usuario.PapelMotorista},
+	{"Motorista Dois", "Motorista Dois", "motorista2", "motorista123", usuario.PapelMotorista},
 }
 
 func main() {
+	modoDemo := flag.Bool("demo", false, "cria os dados da demonstração da Rede Orbit")
+	centro := flag.String("centro", demo.CentroPadrao, "com -demo: lat,lng do local da apresentação (os pórticos simulados ficam em volta)")
+	zerar := flag.Bool("zerar", false, "com -demo: apaga leituras, pórticos e contadores da demo antes de semear")
+	flag.Parse()
 	ctx := context.Background()
 
 	cfg, err := config.Load()
@@ -39,6 +50,13 @@ func main() {
 
 	if err := pool.AplicarMigracoes(ctx); err != nil {
 		log.Fatalf("erro ao aplicar migrações: %v", err)
+	}
+
+	if *modoDemo {
+		if err := semearDemo(ctx, pool, *centro, *zerar); err != nil {
+			log.Fatalf("erro ao criar dados da demonstração: %v", err)
+		}
+		return
 	}
 
 	empresas := empresa.NovoRepositorio(pool)
@@ -59,6 +77,7 @@ func main() {
 		u, err := usuarios.Criar(ctx, usuario.Usuario{
 			EmpresaID: e.ID,
 			Nome:      c.nome,
+			Apelido:   c.apelido,
 			Login:     c.login,
 			SenhaHash: hash,
 			Papel:     c.papel,

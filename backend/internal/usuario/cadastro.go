@@ -184,7 +184,7 @@ func (r *Repositorio) CriarMotorista(ctx context.Context, empresa string, d Dado
 		return nil, erroCadastro(err)
 	}
 	m := MotoristaCadastrado{Nome: d.Nome + " " + d.Sobrenome, PrimeiroNome: d.Nome, Sobrenome: d.Sobrenome, CPF: d.CPF, Login: d.CPF, Veiculo: v}
-	err = tx.QueryRow(ctx, `insert into usuario(empresa_id,nome,primeiro_nome,sobrenome,cpf,login,senha_hash,papel,veiculo_id) values($1,$2,$3,$4,$5,$6,$7,'motorista',$8) returning id`, empresa, m.Nome, m.PrimeiroNome, m.Sobrenome, m.CPF, m.Login, hash, v.ID).Scan(&m.ID)
+	err = tx.QueryRow(ctx, `insert into usuario(empresa_id,nome,primeiro_nome,sobrenome,cpf,login,senha_hash,papel,veiculo_id,apelido) values($1,$2,$3,$4,$5,$6,$7,'motorista',$8,left($3,24)) returning id`, empresa, m.Nome, m.PrimeiroNome, m.Sobrenome, m.CPF, m.Login, hash, v.ID).Scan(&m.ID)
 	if err != nil {
 		return nil, erroCadastro(err)
 	}
