@@ -173,6 +173,15 @@ func TestContratoRedeOrbit(t *testing.T) {
 		}
 		c.chamar("GET", "/rede/orbits/"+orbitDeTeste()+"/leituras", tokenAdmin, nil, http.StatusNotFound)
 
+		// Princípio VII / SC-008: nada do que o painel recebe identifica quem
+		// fez a leitura.
+		respostas := mustJSON(orbits) + mustJSON(historico)
+		for _, proibido := range []string{pontoID, emailPonto, "ApelidoSecreto", "Pessoa Ponto", "usuario"} {
+			if strings.Contains(respostas, proibido) {
+				t.Fatalf("rota do painel expõe dado de quem leu (%q): %s", proibido, respostas)
+			}
+		}
+
 		c.chamar("POST", "/rede/pontos-fixos", tokenAdmin, map[string]any{"nome": "x", "latitude": -23.6, "longitude": -46.8, "raio_metros": 1}, http.StatusUnprocessableEntity)
 		ponto := c.chamar("POST", "/rede/pontos-fixos", tokenAdmin, map[string]any{"nome": "Pórtico de teste", "latitude": -23.6, "longitude": -46.8, "raio_metros": 300}, http.StatusCreated)
 		pontoFixoID, _ := ponto["id"].(string)

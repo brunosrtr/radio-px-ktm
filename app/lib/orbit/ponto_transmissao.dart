@@ -31,6 +31,7 @@ class ApiEnviadorLeituras implements EnviadorLeituras {
     try {
       await _api.dio.post('/leituras', data: {'leituras': leituras});
     } on DioException catch (e) {
+      if (e.response?.statusCode == 403) throw const SemConsentimento();
       if (e.response?.statusCode == 422) {
         throw LoteRecusado((e.response?.data as Map?)?['mensagem'] as String? ?? 'lote inválido');
       }
@@ -64,7 +65,16 @@ class PontoTransmissao extends ChangeNotifier {
     obterPosicao: _rastreador.obter,
     enviador: ApiEnviadorLeituras(apiClient: _api),
     aoRegistrar: () => _bip.tocar(som: bipSom, vibracao: bipVibracao),
+    aoPerderConsentimento: () => unawaited(_consentimentoRevogadoNoServidor()),
   );
+
+  /// O consentimento foi revogado em outro lugar: desliga aqui também.
+  Future<void> _consentimentoRevogadoNoServidor() async {
+    final prefs = await _abrirPreferencias();
+    await prefs.put(_chaveAtivo, false);
+    await _parar();
+    _definir(EstadoPonto.desativado, 'O ponto de transmissão foi desligado na sua conta.');
+  }
 
   EstadoPonto _estado = EstadoPonto.desativado;
   String? _mensagem;
@@ -128,7 +138,9 @@ class PontoTransmissao extends ChangeNotifier {
   Future<void> desativar() async {
     final prefs = await _abrirPreferencias();
     await prefs.put(_chaveAtivo, false);
-    await _parar();
+    await _parar(enviarPendentes: false);
+    // Quem desliga não quer que nada mais saia do aparelho (FR-028).
+    await leituras.descartarPendentes();
     _definir(EstadoPonto.desativado);
     try {
       await _api.dio.put('/me/consentimentos/ponto_transmissao', data: {'aceito': false});
@@ -221,16 +233,16 @@ class PontoTransmissao extends ChangeNotifier {
     await _iniciar(pedirPermissoes: true);
   }
 
-  void _pararBusca() {
+  void _pararBusca({bool enviarPendentes = true}) {
     if (!_buscando) return;
     _buscando = false;
-    unawaited(leituras.parar());
+    unawaited(leituras.parar(enviarPendentes: enviarPendentes));
   }
 
-  Future<void> _parar() async {
+  Future<void> _parar({bool enviarPendentes = true}) async {
     await _assinaturaEstado?.cancel();
     _assinaturaEstado = null;
-    _pararBusca();
+    _pararBusca(enviarPendentes: enviarPendentes);
     await _rastreador.parar();
     try {
       await BackgroundService.parar(MotivoSegundoPlano.pontoTransmissao);

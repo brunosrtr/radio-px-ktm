@@ -323,6 +323,17 @@
 
 **Checkpoint**: parar e pedir o aceite do usuário (Princípio II).
 
-## Etapa 7 — Contribuição e privacidade (US7) · *a detalhar*
+## Etapa 7 — Contribuição e privacidade (US7)
+
+**Objetivo**: fechar os pontos de privacidade em aberto e conferir o SC-008 tela a tela. A aba Contribuição, os termos, a privacidade e o liga/desliga do ponto de transmissão já entraram na Etapa 5.
+
+**Critério de aceite**: [checklists/privacidade.md](./checklists/privacidade.md) conferido tela a tela; testes verdes.
+
+- [X] T098 Retenção automática (`backend/internal/retencao/`): apaga leituras Orbit e histórico de posições com mais de 90 dias e códigos de recuperação vencidos há mais de 1 dia, uma vez ao subir e depois a cada 24 h, com teste
+- [X] T099 [US1] Revogar o consentimento descarta as leituras que ainda estão na fila do aparelho; `403 sem_consentimento` no envio também descarta a fila e suspende a função (o consentimento pode ter sido revogado em outro aparelho), com teste em `leituras_service_test.dart`
+- [X] T100 Teste de privacidade das rotas do painel (`/rede/orbits`, histórico): nenhuma resposta contém id, nome, apelido ou e-mail de quem leu
+- [X] T101 Atualizar `backend/painel/termos.html` e `privacidade.html`: canais da comunidade, convites e remoção, favoritos, retenção de 90 dias e fila local de leituras
+- [X] T102 [`checklists/privacidade.md`](./checklists/privacidade.md): conferência do SC-008 e do Princípio VII tela a tela (app e painel), com a evidência de cada item e os riscos que ficam
+
 
 ## Etapa 8 — Preparação da demo · *a detalhar*

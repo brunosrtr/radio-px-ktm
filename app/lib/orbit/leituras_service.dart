@@ -31,6 +31,13 @@ class LoteRecusado implements Exception {
   final String motivo;
 }
 
+/// O servidor recusou porque o usuário não consente mais em ser ponto de
+/// transmissão (403 sem_consentimento) — por exemplo, revogou em outro
+/// aparelho. As leituras na fila não podem mais ser enviadas.
+class SemConsentimento implements Exception {
+  const SemConsentimento();
+}
+
 /// Envio das leituras ao backend (POST /leituras e /ponto/sinal).
 abstract interface class EnviadorLeituras {
   Future<void> enviarLote(List<Map<String, dynamic>> leituras);
@@ -48,6 +55,7 @@ class LeiturasService {
     DeduplicadorLeituras? deduplicador,
     Future<void> Function()? aoRegistrar,
     DateTime Function()? relogio,
+    this.aoPerderConsentimento,
   }) : _fila = fila, // ignore: prefer_initializing_formals
        _obterPosicao = obterPosicao, // ignore: prefer_initializing_formals
        _enviador = enviador, // ignore: prefer_initializing_formals
@@ -68,6 +76,9 @@ class LeiturasService {
   final DeduplicadorLeituras deduplicador;
   final Future<void> Function()? _aoRegistrar;
   final DateTime Function() _relogio;
+
+  /// Chamado quando o servidor diz que não há mais consentimento.
+  final void Function()? aoPerderConsentimento;
 
   /// Leituras registradas nesta sessão (mostradas ao usuário, sem detalhes
   /// do Orbit — FR-011).
@@ -124,6 +135,12 @@ class LeiturasService {
         } on LoteRecusado {
           // Descarta o lote inválido (ex.: relógio do celular muito errado)
           // para não bloquear as leituras seguintes.
+        } on SemConsentimento {
+          // Sem consentimento, nada do que está na fila pode sair do
+          // aparelho (FR-028, Princípio VII).
+          await descartarPendentes();
+          aoPerderConsentimento?.call();
+          return;
         }
         await _fila.removerConfirmados(pendentes.keys);
         if (pendentes.length < tamanhoLote) return;
@@ -141,13 +158,20 @@ class LeiturasService {
     } catch (_) {}
   }
 
-  Future<void> parar() async {
+  /// Apaga a fila local sem enviar — usado quando o usuário revoga o
+  /// consentimento.
+  Future<void> descartarPendentes() async {
+    await _fila.abrir();
+    await _fila.removerConfirmados(_fila.listarPendentes(limite: 1 << 30).keys);
+  }
+
+  Future<void> parar({bool enviarPendentes = true}) async {
     await _assinatura?.cancel();
     _assinatura = null;
     _timerEnvio?.cancel();
     _timerEnvio = null;
     _timerSinal?.cancel();
     _timerSinal = null;
-    await enviarPendentes();
+    if (enviarPendentes) await this.enviarPendentes();
   }
 }

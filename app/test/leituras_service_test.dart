@@ -126,6 +126,32 @@ void main() {
     expect(fila.tamanho, 0);
   });
 
+  test('sem consentimento no servidor, a fila é apagada sem enviar', () async {
+    var avisado = false;
+    final semConsentimento = LeiturasService(
+      fila: fila,
+      obterPosicao: () async => posicao,
+      enviador: _EnviadorSemConsentimento(),
+      relogio: () => t0,
+      aoPerderConsentimento: () => avisado = true,
+    );
+    await semConsentimento.processar(deteccao('ORBIT-0A1B2C', Duration.zero));
+    await semConsentimento.processar(deteccao('ORBIT-0A1B2D', Duration.zero));
+    expect(fila.tamanho, 2);
+
+    await semConsentimento.enviarPendentes();
+    expect(fila.tamanho, 0);
+    expect(avisado, isTrue);
+  });
+
+  test('ao revogar, descartarPendentes apaga a fila e parar não envia', () async {
+    await servico.processar(deteccao('ORBIT-0A1B2C', Duration.zero));
+    await servico.parar(enviarPendentes: false);
+    await servico.descartarPendentes();
+    expect(fila.tamanho, 0);
+    expect(enviador.lotes, isEmpty);
+  });
+
   test('ignora o próprio Orbit virtual', () async {
     servico.deduplicador.orbitProprio = 'ORBIT-0A1B2C';
     expect(await servico.processar(deteccao('ORBIT-0A1B2C', Duration.zero)), isFalse);
@@ -143,4 +169,12 @@ void main() {
     await servico.parar();
     await controlador.close();
   });
+}
+
+class _EnviadorSemConsentimento implements EnviadorLeituras {
+  @override
+  Future<void> enviarLote(List<Map<String, dynamic>> leituras) async => throw const SemConsentimento();
+
+  @override
+  Future<void> enviarSinal() async {}
 }
