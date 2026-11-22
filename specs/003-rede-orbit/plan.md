@@ -24,7 +24,7 @@ A rádio da 001 (hub em memória, fila FIFO, áudio nunca persistido) não muda.
 
 **Language/Version**: Go (backend + painel), Dart/Flutter (app), sem mudança em relação à 001.
 **Primary Dependencies**: as da 001, mais:
-- app: `flutter_blue_plus` (leitura BLE), `flutter_ble_peripheral` (Orbit virtual), `go_router` (navegação/deep link), `qr_flutter` (gerar QR do convite);
+- app: `flutter_reactive_ble` (leitura BLE), `flutter_ble_peripheral` (Orbit virtual), `go_router` (navegação/deep link), `qr_flutter` (gerar QR do convite);
 - backend: `net/smtp` da biblioteca padrão (recuperação de senha); nenhuma dependência Go nova.
 
 Ver [research.md](./research.md) §2, §7 e §10.

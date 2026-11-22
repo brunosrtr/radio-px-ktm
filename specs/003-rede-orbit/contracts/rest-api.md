@@ -86,7 +86,7 @@ Erros de entrada no canal (no `GET /canais/{id}` ou na entrada via WS): `banido`
 | POST | `/leituras` | todos (com consentimento) | Lote de leituras (FR-004) |
 | POST | `/ponto/sinal` | todos (com consentimento) | Sinal de vida do ponto de transmissão (FR-018) |
 | GET | `/me/contribuicao` | todos | Contadores do usuário (FR-040) |
-| PUT | `/posicao-atual` | usuário sem empresa | Um ponto, sem histórico (FR-034) |
+| PUT | `/posicao-atual` | todos (o app usa para contas sem empresa) | Um ponto, sem histórico (FR-034); ignora ponto mais antigo que o atual |
 | GET | `/rede/orbits` | admin_ktm | Última posição de cada Orbit |
 | GET | `/rede/orbits/{id}/leituras?de=&ate=` | admin_ktm | Histórico de leituras (FR-019) |
 | GET/POST/DELETE | `/rede/pontos-fixos[/{id}]` | admin_ktm | Pontos fixos (FR-020) |

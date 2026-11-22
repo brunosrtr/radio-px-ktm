@@ -3,7 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2026-11-21
 
 ## Active Technologies
-- Acréscimos da 003-rede-orbit — App: `flutter_blue_plus` (leitura BLE do sinal Orbit), `flutter_ble_peripheral` (Orbit virtual), `go_router` (navegação/deep link), `qr_flutter` (QR de convite). Backend: `net/smtp` (recuperação de senha), migrações `0004`–`0006`; Hive ganha a caixa `fila_leituras`. Formato do sinal Orbit só em `app/lib/orbit/orbit_sinal.dart`; integração KTM só via `orbit.Integracao`. (003-rede-orbit)
+- Acréscimos da 003-rede-orbit — App: `flutter_reactive_ble` (leitura BLE do sinal Orbit; não usar `flutter_blue_plus`, que exige licença comercial), `flutter_ble_peripheral` (Orbit virtual), `go_router` (navegação/deep link), `qr_flutter` (QR de convite). Backend: `net/smtp` (recuperação de senha), migrações `0004`–`0006`; Hive ganha a caixa `fila_leituras`. Formato do sinal Orbit só em `app/lib/orbit/orbit_sinal.dart`; integração KTM só via `orbit.Integracao`. (003-rede-orbit)
 
 - Go (backend + painel), Dart/Flutter (app móvel) + Backend — `pgx` (Postgres), `chi` (roteamento HTTP), `coder/websocket` (WebSocket), `golang-jwt` (JWT). App — `riverpod` (estado), `dio` (HTTP), `web_socket_channel`, `geolocator` (localização), `flutter_foreground_task` (segundo plano Android), `flutter_sound` (gravação/reprodução Opus em streaming). Painel — templates HTML nativos do Go + Leaflet (mapa). (001-radio-px-digital)
 

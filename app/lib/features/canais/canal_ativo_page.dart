@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../core/theme.dart';
-import '../../core/token_storage.dart';
 import '../../services/audio_service.dart';
 import '../../services/background_service.dart';
 import '../../services/canal_service.dart';
@@ -334,13 +333,10 @@ class _CanalAtivoPageState extends State<CanalAtivoPage> {
     return (a + b).toUpperCase();
   }
 
-  /// O trajeto só é registrado para contas vinculadas a uma empresa (FR-034
-  /// da 003-rede-orbit); contas do público não enviam histórico.
-  Future<void> _iniciarHistoricoDePosicoes() async {
-    if (TokenStorage.instance.usuario?.temEmpresa ?? false) {
-      await _localizacaoService.iniciar();
-    }
-  }
+  /// Contas com empresa enviam o trajeto; as do público só a posição atual,
+  /// para a geocerca (FR-034 da 003-rede-orbit) — o LocalizacaoService
+  /// decide pelo tipo de conta.
+  Future<void> _iniciarHistoricoDePosicoes() => _localizacaoService.iniciar();
 
   @override
   Widget build(BuildContext context) {

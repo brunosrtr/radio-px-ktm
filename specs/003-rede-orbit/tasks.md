@@ -207,9 +207,45 @@
 
 **Checkpoint**: parar e pedir o aceite do usuário (Princípio II).
 
-## Etapa 3 — Ponto de transmissão e Orbit virtual no app (US1, US2) · *a detalhar*
+## Etapa 3 — Ponto de transmissão e Orbit virtual no app (US1, US2)
 
-`app/lib/orbit/` (`orbit_sinal.dart` com parser 🔒, `deduplicador_leituras.dart` 🔒, `leitor_orbit.dart`, `orbit_virtual.dart`, `leituras_service.dart`); `fila_leituras_local.dart`; busca BLE no foreground service; permissões e `UIBackgroundModes`; bip; consentimento `ponto_transmissao`; `PUT /posicao-atual` e modo leitura do `LocalizacaoService`.
+**Objetivo**: o celular detecta o sinal do Orbit (real ou virtual), faz o bip e envia a leitura em lote, inclusive em segundo plano e depois de ficar sem internet. Um celular Android com conta `demo` ou `admin_ktm` faz o papel do Orbit.
+
+**Critério de aceite**: passos 3 a 6 do [quickstart.md](./quickstart.md) em aparelhos reais; `flutter test` verde.
+
+**Decisão desta etapa**: a leitura BLE usa `flutter_reactive_ble` (BSD-3) em vez de `flutter_blue_plus`. A versão 2.x do `flutter_blue_plus` exige licença comercial para uso por empresa com fins lucrativos e envia telemetria no build ([research.md §2](./research.md)).
+
+### Backend
+
+- [X] T057 [US1] `PUT /posicao-atual` (só para quem não tem empresa; um ponto, sem histórico — FR-034), em `backend/internal/transporte/posicoes_handler.go` e `backend/internal/posicao/repositorio.go`, com teste
+
+### Núcleo da leitura (puro, testado)
+
+- [X] T058 [P] [US1] 🔒 `app/lib/orbit/orbit_sinal.dart`: UUID Rede Orbit, `codificarCarga(orbitId)` e `lerCarga(bytes)` conforme [contracts/sinal-orbit.md](./contracts/sinal-orbit.md), com teste em `app/test/orbit_sinal_test.dart`
+- [X] T059 [P] [US1] 🔒 `app/lib/orbit/deduplicador_leituras.dart`: no máximo uma leitura por Orbit a cada 30 s e ignora o próprio Orbit virtual, com teste em `app/test/deduplicador_leituras_test.dart`
+- [X] T060 [P] [US1] `app/lib/data/fila_leituras_local.dart`: caixa Hive `fila_leituras`, que descarta itens com mais de 7 dias e remove só o que o servidor confirmou
+
+### Serviços
+
+- [X] T061 [US1] `app/lib/orbit/leitor_orbit.dart`: busca BLE filtrada pelo UUID (`flutter_reactive_ble`) que emite `DeteccaoOrbit(orbitId, rssi, instante)`
+- [X] T062 [US1] `app/lib/orbit/leituras_service.dart`:
+  - junta cada detecção com a última posição de no máximo 60 s, deduplica, enfileira e faz o bip;
+  - envia lotes de até 100 a cada 15 s e sinal de vida a cada 5 min;
+  - mantém o contador da sessão;
+  - dependências injetáveis, com teste em `app/test/leituras_service_test.dart`
+- [X] T063 [US2] `app/lib/orbit/orbit_virtual.dart`: anúncio BLE (`flutter_ble_peripheral`), com UUID no pacote principal e Service Data na resposta de varredura; só Android
+- [X] T064 [US1] `app/lib/orbit/ponto_transmissao.dart`: controlador da função, com estados desativada/ativa/suspensa, preferências em Hive (`preferencias`), consentimento no backend, permissões e início/parada junto com a sessão
+- [X] T065 [US1] `app/lib/services/background_service.dart`: foreground service compartilhado por motivo (canal de voz e/ou ponto de transmissão), com os tipos de serviço certos para cada um
+- [X] T066 [US1] `app/lib/services/localizacao_service.dart`: modo leitura (`PUT /posicao-atual`) para quem não tem empresa, usado na lista de canais
+
+### Plataformas e telas
+
+- [X] T067 [US1] Permissões Android (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, `BLUETOOTH_ADVERTISE`, legadas até a API 30, `FOREGROUND_SERVICE_CONNECTED_DEVICE` e tipo `connectedDevice`) e iOS (`NSBluetoothAlwaysUsageDescription`, `UIBackgroundModes` com `bluetooth-central`)
+- [X] T068 [US1] Cartão "Ponto de transmissão" na lista de canais, com explicação, consentimento, estado e leituras da sessão; ajustes de bip e vibração em "Minha conta"
+- [X] T069 [US2] `app/lib/features/configuracoes/orbit_virtual_page.dart`: ID do Orbit, aviso permanente enquanto anuncia; só para `admin_ktm`/`demo`
+- [ ] T070 Rodar `flutter analyze`, `flutter test`, `go test ./...` e compilar o app (feito: testes verdes e build iOS de dispositivo; pendente: APK, porque esta máquina não tem Android SDK, e o build de simulador, que falha no framework Opus)
+
+**Checkpoint**: aceite em aparelhos reais (Bluetooth não funciona no simulador) e confirmação do usuário (Princípio II).
 
 ## Etapa 4 — Protótipo de UX (US6) · *a detalhar*
 

@@ -4,6 +4,9 @@ import '../../core/routes.dart';
 import '../../core/token_storage.dart';
 import '../auth/auth_service.dart';
 import '../auth/documentos_legais.dart';
+import '../../orbit/ponto_transmissao.dart';
+import '../ponto/cartao_ponto_transmissao.dart';
+import '../ponto/orbit_virtual_page.dart';
 
 /// Tela provisória "Minha conta": apelido, e-mail, sair e excluir conta
 /// (FR-026). Vira a aba Perfil na Etapa 5 da 003-rede-orbit.
@@ -45,6 +48,7 @@ class _ContaPageState extends State<ContaPage> {
 
     setState(() => _excluindo = true);
     try {
+      await PontoTransmissao.instance.encerrarSessao();
       await _authService.excluirConta();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sua conta foi excluída.')));
@@ -76,6 +80,44 @@ class _ContaPageState extends State<ContaPage> {
               subtitle: const Text('E-mail'),
             ),
           const Divider(),
+          ListenableBuilder(
+            listenable: PontoTransmissao.instance,
+            builder: (context, _) {
+              final ponto = PontoTransmissao.instance;
+              return Column(
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.sensors),
+                    title: const Text('Ponto de transmissão'),
+                    subtitle: const Text('Avisa a KTM quando você passa perto de um caminhão com Orbit.'),
+                    value: ponto.ligado,
+                    onChanged: (ligar) => ligar ? confirmarPontoTransmissao(context) : ponto.desativar(),
+                  ),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.volume_up_outlined),
+                    title: const Text('Som do bip'),
+                    value: ponto.bipSom,
+                    onChanged: (v) => ponto.definirBip(som: v),
+                  ),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.vibration),
+                    title: const Text('Vibração do bip'),
+                    value: ponto.bipVibracao,
+                    onChanged: (v) => ponto.definirBip(vibracao: v),
+                  ),
+                ],
+              );
+            },
+          ),
+          if (PontoTransmissao.podeUsarOrbitVirtual(usuario?.papel))
+            ListTile(
+              leading: const Icon(Icons.local_shipping_outlined),
+              title: const Text('Modo Orbit virtual'),
+              subtitle: const Text('Demonstração: este celular se passa por um Orbit.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrbitVirtualPage())),
+            ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Termos de uso'),
@@ -90,7 +132,8 @@ class _ContaPageState extends State<ContaPage> {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sair'),
-            onTap: () {
+            onTap: () async {
+              await PontoTransmissao.instance.encerrarSessao();
               _authService.sair();
               _irParaLogin();
             },

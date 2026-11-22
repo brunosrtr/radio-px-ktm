@@ -27,13 +27,13 @@ O formato fica num único arquivo de definição no app (`orbit_sinal.dart`), es
 
 ## 2. Pacotes Flutter de BLE
 
-**Decisão**:
-- **Leitura (central)**: `flutter_blue_plus`, que é o pacote de BLE central mais mantido do ecossistema e permite filtrar por Service UUID (`withServices`) e ler `serviceData` do resultado da busca.
-- **Anúncio (periférico, só no Orbit virtual)**: `flutter_ble_peripheral`, que tem API simples de anúncio, suporta Service Data no Android e tem verificação `isSupported` para aparelhos sem suporte a anúncio ([pub.dev](https://pub.dev/packages/flutter_ble_peripheral)).
+**Decisão** (revista na Etapa 3, em 2026-11-21):
+- **Leitura (central)**: `flutter_reactive_ble` (licença BSD-3, mantido pela Signify/Philips Hue). Ele filtra por Service UUID (`scanForDevices(withServices: ...)`), entrega `serviceData` e `rssi` em cada `DiscoveredDevice` e, no iOS, busca com `AllowDuplicates`, o que permite reler um Orbit que continua no alcance.
+- **Anúncio (periférico, só no Orbit virtual)**: `flutter_ble_peripheral` 3.x (BSD-3). No Android, `AndroidAdvertiseSettings.advertiseResponseData` aceita `serviceDataUuid` + `serviceData`, o que permite pôr o Service Data na resposta de varredura, como pede o contrato. Tem verificação `isSupported` para aparelhos sem suporte a anúncio ([pub.dev](https://pub.dev/packages/flutter_ble_peripheral)).
 
-As versões exatas são fixadas no `pubspec.yaml` na implementação (tarefa da Etapa 2), depois de conferir o changelog. O `flutter_blue_plus` teve uma regressão no filtro `withServiceData` do Android ([changelog](https://pub.dev/packages/flutter_blue_plus/changelog)). Usamos `withServices`, não `withServiceData`, e o Service Data é lido do resultado.
+**Por que não `flutter_blue_plus`**: a versão 2.x passou a usar a "FlutterBluePlus License". Ela exige licença comercial paga para uso por organizações com fins lucrativos e faz uma chamada de telemetria no build (nome do pacote, nome e versão do app). O TCC em si estaria isento como uso educacional, mas a adoção pela KTM não estaria, e a telemetria contraria a postura de privacidade do projeto.
 
-**Alternativas consideradas**: `flutter_reactive_ble`, que é bom, mas tem manutenção mais lenta e não anuncia; `ble_peripheral` / `ble_peripheral_plus`, que têm foco em servidor GATT e são mais do que precisamos.
+**Alternativas consideradas**: `flutter_blue_plus` (licença acima); `ble_peripheral` / `ble_peripheral_plus` (foco em servidor GATT, mais do que precisamos).
 
 ## 3. Leitura em segundo plano
 

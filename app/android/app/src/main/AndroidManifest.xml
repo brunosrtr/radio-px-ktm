@@ -13,6 +13,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Rede Orbit (003-rede-orbit): busca e anúncio Bluetooth LE. A busca
+         também usa a localização (a leitura leva a posição do celular), por
+         isso BLUETOOTH_SCAN não declara neverForLocation. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <application
         android:usesCleartextTraffic="true"
         android:label="radio_px_app"
@@ -20,7 +30,7 @@
         android:icon="@mipmap/ic_launcher">
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
-            android:foregroundServiceType="location|microphone|mediaPlayback"
+            android:foregroundServiceType="location|microphone|mediaPlayback|connectedDevice"
             android:exported="false"
             android:stopWithTask="true" />
         <activity

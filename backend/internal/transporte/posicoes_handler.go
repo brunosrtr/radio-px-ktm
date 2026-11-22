@@ -81,6 +81,35 @@ func (h *PosicoesHandler) Receber(w http.ResponseWriter, r *http.Request) {
 	responderJSON(w, http.StatusAccepted, map[string]any{"pontos_recebidos": len(pontos)})
 }
 
+// AtualizarAtual implementa PUT /posicao-atual: um único ponto, que só
+// atualiza a posição atual (geocerca e canais próximos) sem gravar histórico.
+// É o que contas sem empresa usam no lugar de POST /posicoes (FR-034).
+func (h *PosicoesHandler) AtualizarAtual(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.ClaimsDoContexto(r.Context())
+	if !ok {
+		responderErro(w, http.StatusUnauthorized, "token_invalido", "token ausente ou inválido")
+		return
+	}
+	var p corpoPonto
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil || p.CapturadoEm == nil {
+		responderErro(w, http.StatusBadRequest, "ponto_invalido", "informe latitude, longitude e capturado_em")
+		return
+	}
+	err := h.servico.AtualizarAtual(r.Context(), claims.UsuarioID, posicao.Ponto{
+		Latitude: p.Latitude, Longitude: p.Longitude, PrecisaoMetros: p.PrecisaoMetros,
+		VelocidadeKmh: p.VelocidadeKmh, CapturadoEm: *p.CapturadoEm,
+	})
+	if errors.Is(err, posicao.ErrLoteInvalido) {
+		responderErro(w, http.StatusBadRequest, "ponto_invalido", err.Error())
+		return
+	}
+	if err != nil {
+		responderErro(w, http.StatusInternalServerError, "erro_interno", "não foi possível atualizar a posição")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // PosicoesAtuais implementa GET /empresas/{id}/posicoes-atuais (admin) — só
 // retorna dados quando {id} é a própria empresa do admin (FR-026).
 func (h *PosicoesHandler) PosicoesAtuais(w http.ResponseWriter, r *http.Request) {

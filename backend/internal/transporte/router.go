@@ -124,6 +124,7 @@ func NovoRoteadorCom(cfg config.Config, pool *storage.Pool, deps Dependencias) c
 		r.Put("/canais/{id}/preferencia", canaisHandler.DefinirPreferencia)
 
 		r.Post("/posicoes", posicoesHandler.Receber)
+		r.Put("/posicao-atual", posicoesHandler.AtualizarAtual)
 		r.Get("/empresas/{id}/posicoes-atuais", posicoesHandler.PosicoesAtuais)
 		r.Get("/motoristas/{id}/trajeto", posicoesHandler.Trajeto)
 

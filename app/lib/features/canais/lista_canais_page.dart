@@ -4,6 +4,8 @@ import '../../core/http_client.dart';
 import '../../core/routes.dart';
 import '../../core/theme.dart';
 import '../../core/token_storage.dart';
+import '../../orbit/ponto_transmissao.dart';
+import '../ponto/cartao_ponto_transmissao.dart';
 import 'canal_ativo_page.dart';
 import '../../services/localizacao_service.dart';
 
@@ -26,15 +28,16 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
   String? _erro;
   List<Map<String, dynamic>> _canais = [];
 
-  /// Contas do público não enviam posição para o histórico (FR-034); a
-  /// atualização de posição para canais com geocerca só vale para quem tem
-  /// empresa até a Etapa 3 da 003-rede-orbit.
+  /// Contas do público ainda não têm canais (chegam na Etapa 6 da
+  /// 003-rede-orbit); muda só o texto da lista vazia.
   bool get _temEmpresa => TokenStorage.instance.usuario?.temEmpresa ?? false;
 
   @override
   void initState() {
     super.initState();
     _carregar();
+    // Religa o ponto de transmissão se o usuário o deixou ligado (US1).
+    PontoTransmissao.instance.retomarSeAtivo();
   }
 
   Future<void> _carregar() async {
@@ -45,7 +48,7 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
     try {
       _avisoLocalizacao = null;
       try {
-        if (_temEmpresa) await _localizacao.atualizarPosicaoParaEntrada();
+        await _localizacao.atualizarPosicaoParaEntrada();
       } catch (erro) {
         _avisoLocalizacao = erro is FormatException ? erro.message : 'Não foi possível atualizar o GPS. Canais com área limitada podem não aparecer.';
       }
@@ -131,6 +134,7 @@ class _ListaCanaisPageState extends State<ListaCanaisPage> {
       ),
       body: Column(
         children: [
+          const CartaoPontoTransmissao(),
           if (_avisoLocalizacao != null)
             Padding(
               padding: const EdgeInsets.all(12),

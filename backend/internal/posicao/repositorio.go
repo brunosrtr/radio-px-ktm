@@ -86,6 +86,28 @@ func (r *Repositorio) InserirLote(ctx context.Context, usuarioID string, pontos 
 	return nil
 }
 
+// AtualizarAtual grava só a posição atual do usuário, sem histórico — usada
+// por contas sem empresa (FR-034 da 003-rede-orbit) para a geocerca e os
+// canais próximos. Mesma regra condicional de InserirLote: um ponto mais
+// antigo que o registrado é ignorado.
+func (r *Repositorio) AtualizarAtual(ctx context.Context, usuarioID string, p Ponto) error {
+	_, err := r.pool.Exec(ctx, `
+		insert into posicao_atual (usuario_id, latitude, longitude, velocidade_kmh, capturado_em)
+		values ($1, $2, $3, $4, $5)
+		on conflict (usuario_id) do update set
+			latitude = excluded.latitude,
+			longitude = excluded.longitude,
+			velocidade_kmh = excluded.velocidade_kmh,
+			capturado_em = excluded.capturado_em,
+			atualizado_em = now()
+		where excluded.capturado_em > posicao_atual.capturado_em
+	`, usuarioID, p.Latitude, p.Longitude, p.VelocidadeKmh, p.CapturadoEm)
+	if err != nil {
+		return fmt.Errorf("posicao: erro ao atualizar posição atual: %w", err)
+	}
+	return nil
+}
+
 // PosicoesAtuaisPorEmpresa retorna a última posição conhecida de cada
 // motorista ativo da empresa (FR-026) — nunca consulta o histórico
 // (posicao) para montar o mapa, só posicao_atual.
